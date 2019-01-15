@@ -905,7 +905,7 @@ write_csv(sanJR_r, "station_files/stations_raw/merged/sanJR_e_r.csv")
 #make a new column and convert temperature from farenheit to celsius
 sanJR_r$s25 <- as.numeric(sanJR_r$s25)
 sanJR_r$Temp <- ((sanJR_r$s25)-32)/1.8
-sanJR_r$Temp <- round(sanJR_std$Temp, digits = 1)
+sanJR_r$Temp <- round(sanJR_r$Temp, digits = 1)
 
 # write file
 sanJR_std <- sanJR_r[,c(1,3,4)]
@@ -931,9 +931,9 @@ Then we can create each individual standardized file.
 
 ```{r std stations, message = FALSE}
 library(dplyr)
-
 # if you just want to rewrite one/a few stations: 
-# write_csv(BDL_std, "station_files/stations_std/BDL_std.csv")
+#VNS_std <- sanJR_std %>% filter(station =="VNS")
+#write_csv(VNS_std, "station_files/stations_std/VNS_std.csv")
 # Otherwise, use code below.
 
 # Celsius
@@ -984,11 +984,12 @@ for (name in levels(sanJR_std1$station)) {
   write_csv(tmp,fn)
 }
 
+
 # Merge SJR_C and SJR_F before writing. This will overwrite the file created for SJR (above)
 SJR_C_std <- celsius_std %>% filter(station == "SJR")# celsius and fahrenheit
 SJR_F_std <- sanJR_std %>% filter(station == "SJR")
 SJR_std <- rbind(SJR_F_std, SJR_C_std) # merge F and C files into one for SJR
-write_csv(SJR_std, "station_files/stations_std/VNS_std.csv")
+write_csv(SJR_std, "station_files/stations_std/SJR_std.csv")
 
 ```
 Merge celsius stations into other datasets. 
