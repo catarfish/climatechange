@@ -1,0 +1,259 @@
+---
+title: "QAQC_Vis"
+author: "Catarina Pien"
+date: "December 17, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+```{r clean, include = FALSE, eval = FALSE}
+rm(list=ls(all=TRUE))
+```
+
+
+```{r message = FALSE, include = FALSE}
+library(readr)
+library(lubridate)
+library(dplyr)
+
+
+# Read in overall files (if needed)
+setwd("P:/ClimateChange/R_code/")
+allsta_q3 <- read_csv("station_files/stations_qa/merged/allsta_q3.csv")
+allsta_q4 <- read_csv("station_files/stations_qa/merged/allsta_q4.csv")
+allsta_q5 <- read_csv("station_files/stations_qa/merged/allsta_q5.csv")
+
+### Write each station file to global environment
+allsta_q3$station <- as.factor(allsta_q3$station) # need to factorize the "stations"
+
+for (name in levels(allsta_q3$station)) {
+  temp=subset(allsta_q3, station==name)
+  fn=assign(paste0(name,"_q3"),temp, envir = globalenv())
+  }
+
+### Write each station file to global environment
+allsta_q4$station <- as.factor(allsta_q4$station) # need to factorize the "stations"
+
+for (name in levels(allsta_q4$station)) {
+  temp=subset(allsta_q4, station==name)
+  fn=assign(paste0(name,"_q4"),temp, envir = globalenv())
+  }
+
+### Write each station file to global environment
+allsta_q5$station <- as.factor(allsta_q5$station) # need to factorize the "stations"
+
+for (name in levels(allsta_q5$station)) {
+  temp=subset(allsta_q5, station==name)
+  fn=assign(paste0(name,"_q5"),temp, envir = globalenv())
+}
+
+# In case you want to read one station in: 
+#BAC_q4 <- allsta_q4 %>% filter(station == "BAC")
+
+```
+
+
+## Plot data 
+### Compare pre-outlier testing with post-outlier testing
+Outlier testing here is the modified Z-score method 
+median 
+```{r plots, message = FALSE, echo = FALSE}
+
+library(ggplot2)
+library(scales)
+library(data.table)
+
+BDL_com <-  rbindlist(list(BDL_q3, BDL_q4[,c(1:9,13)], BDL_q5[,c(1:9,15)]))
+GLC_com <- rbindlist(list(GLC_q3, GLC_q4[,c(1:9,13)], GLC_q5[,c(1:9,15)]))
+PTS_com <- rbindlist(list(PTS_q3, PTS_q4[,c(1:9,13)], GLC_q5[,c(1:9,15)]))
+MAL_com <-  rbindlist(list(MAL_q3, MAL_q4[,c(1:9,13)], MAL_q5[,c(1:9,15)]))
+SRH_com <-  rbindlist(list(SRH_q3, SRH_q4[,c(1:9,13)], SRH_q5[,c(1:9,15)]))
+MRZ_com <-  rbindlist(list(MRZ_q3, MRZ_q4[,c(1:9,13)], MRZ_q5[,c(1:9,15)]))
+UNI_com <-  rbindlist(list(UNI_q3, UNI_q4[,c(1:9,13)], UNI_q5[,c(1:9,15)]))
+FRP_com <-  rbindlist(list(FRP_q3, FRP_q4[,c(1:9,13)], FRP_q5[,c(1:9,15)]))
+
+BDL_com$qa <- as.factor(BDL_com$qa)
+GLC_com$qa <- as.factor(GLC_com$qa)
+PTS_com$qa <- as.factor(PTS_com$qa)
+MAL_com$qa <- as.factor(MAL_com$qa)
+SRH_com$qa <- as.factor(SRH_com$qa)
+MRZ_com$qa <- as.factor(MRZ_com$qa)
+UNI_com$qa <- as.factor(UNI_com$qa)
+FRP_com$qa <- as.factor(FRP_com$qa)
+
+ggplot(BDL_com, aes(datetime, Temp, col = qa, shape = qa)) +
+  geom_point(alpha=0.5) +
+  labs(title = "BDL") +
+  scale_x_datetime(breaks = "1 year", labels = date_format("%Y"))+
+  theme_bw()
+
+ggplot(GLC_com, aes(datetime, Temp, col = qa, shape = qa)) +
+  geom_point(alpha=0.5) +
+  labs(title = "GLC") +
+  theme_bw()
+
+ggplot(PTS_com, aes(datetime, Temp, col = qa, shape = qa)) +
+  geom_point(alpha=0.5) +
+  labs(title = "PTS") +
+  theme_bw()
+
+ggplot(MAL_com, aes(datetime, Temp, col = qa, shape = qa)) +
+  geom_point(alpha=0.5) +
+  labs(title = "MAL") +
+  theme_bw()
+
+ggplot(SRH_com, aes(datetime, Temp, col = qa, shape = qa)) +
+  geom_point(alpha=0.5) +
+  labs(title = "SRH") +
+  theme_bw()
+  
+ggplot(MRZ_com, aes(datetime, Temp, col = qa, shape = qa)) +
+  geom_point(alpha=0.5) +
+  labs(title = "MRZ") +
+  theme_bw()
+  
+ggplot(UNI_com, aes(datetime, Temp, col = qa, shape = qa)) +
+  geom_point(alpha=0.5) +
+  labs(title = "UNI") +
+  theme_bw()
+  
+ggplot(FRP_com, aes(datetime, Temp, col = qa, shape = qa)) +
+  geom_point(alpha=0.5) +
+  labs(title = "FRP") +
+  theme_bw()
+```
+
+
+## Calculate temperature ranges
+## Make heatmaps
+
+```{r temp ranges, message = FALSE}
+
+library(lubridate)
+library(dplyr)
+library(tidyr)
+library(RColorBrewer)
+
+Trange_q4 <- allsta_q4 %>%
+  group_by(region, station, year) %>%
+  summarize(Tmin = min(Temp),
+            Tmax = max(Temp),
+            range = Tmax-Tmin)
+
+llmerge <- read_csv("latlonsTomerge.csv")
+latlon_q4 <- left_join(llmerge, Trange_q4, by = "station")
+write_csv(latlon_q4, "rangelatlon.csv")
+
+# heatmap 
+
+allsta <- latlon_q4 
+allsta$year <- as.factor(allsta$year)
+allsta$range <- as.numeric(allsta$range)
+allsta$Tmax <- as.numeric(allsta$Tmax)
+
+# map for temperature ranges
+allstaR <- allsta[,c(1,6,8,11)]
+allstaR0 <- allstaR %>% spread(key=year, value=range) %>% arrange(Longitude)
+allstaR.m <- as.data.frame(allstaR0)
+row.names(allstaR.m) <- allstaR.m$station
+allstaR.m <- allstaR.m[,3:35]
+allstaR_matrix <- data.matrix(allstaR.m)
+
+heatmap(allstaR_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlGnBu"), scale = "column")
+
+
+# boxplots of ranges
+
+ggplot(latlon_q4) +
+  geom_boxplot(aes(x = station, y = range)) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=90, hjust=1))
+
+
+### delta 
+
+delta <- latlon %>% filter(region == "delta")
+delta$year <- as.factor(delta$year)
+delta$range <- as.numeric(delta$range)
+delta$Tmax <- as.numeric(delta$Tmax)
+
+# map for temperature ranges
+deltaR <- delta[,c(1,6,8,11)]
+deltaR0 <- deltaR %>% spread(key=year, value=range) %>% arrange(Longitude)
+deltaR.m <- as.data.frame(deltaR0)
+row.names(deltaR.m) <- deltaR.m$station
+deltaR.m <- deltaR.m[,3:26]
+deltaR_matrix <- data.matrix(deltaR.m)
+
+# yellow is small range
+heatmap(deltaR_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlGnBu"), scale = "column")
+
+# map for max temperatures 
+deltaT <- delta[,c(1,6,8,10)]
+deltaT0 <- deltaT %>% spread(key=year, value=Tmax) %>% arrange(Longitude)
+
+deltaT.m <- as.data.frame(deltaT0)
+row.names(deltaT.m) <- deltaT.m$station
+deltaT.m <- deltaT.m[,3:26]
+deltaT_matrix <- data.matrix(deltaT.m)
+
+heatmap(deltaT_matrix, Rowv = NA, Colv = NA, col = brewer.pal(10, "YlOrRd"), scale = "column")
+
+### sacR
+sacR <- latlon %>% filter(region == "sacR")
+sacR$year <- as.factor(sacR$year)
+sacR$range <- as.numeric(sacR$range)
+sacR$Tmax <- as.numeric(sacR$Tmax)
+
+# map for temperature ranges
+sacRR <- sacR[,c(1,6,8,11)]
+sacRR0 <- sacRR %>% spread(key=year, value=range) %>% arrange(Longitude)
+sacRR.m <- as.data.frame(sacRR0)
+row.names(sacRR.m) <- sacRR.m$station
+sacRR.m <- sacRR.m[,3:34]
+sacRR_matrix <- data.matrix(sacRR.m)
+
+heatmap(sacRR_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlGnBu"), scale = "row")
+
+# map for max temperatures 
+sacRT <- sacR[,c(1,6,8,10)]
+sacRT0 <- sacRT %>% spread(key=year, value=Tmax) %>% arrange(Longitude)
+
+sacRT.m <- as.data.frame(sacRT0)
+row.names(sacRT.m) <- sacRT.m$station
+sacRT.m <- sacRT.m[,3:34]
+sacRT_matrix <- data.matrix(sacRT.m)
+
+heatmap(sacRT_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlOrRd"), scale = "row")
+
+### sanJR
+sanJR <- latlon %>% filter(region == "sanJR")
+sanJR$year <- as.factor(sanJR$year)
+sanJR$range <- as.numeric(sanJR$range)
+sanJR$Tmax <- as.numeric(sanJR$Tmax)
+
+# map for temperature ranges
+sanJRR <- sanJR[,c(1,6,8,11)]
+sanJRR0 <- sanJRR %>% spread(key=year, value=range) %>% arrange(Longitude)
+sanJRR.m <- as.data.frame(sanJRR0)
+row.names(sanJRR.m) <- sanJRR.m$station
+sanJRR.m <- sanJRR.m[,3:22]
+sanJRR_matrix <- data.matrix(sanJRR.m)
+
+heatmap(sanJRR_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlGnBu"), scale = "column")
+
+# map for max temperatures 
+sanJRT <- sanJR[,c(1,6,8,10)]
+sanJRT0 <- sanJRT %>% spread(key=year, value=Tmax) %>% arrange(Longitude)
+
+sanJRT.m <- as.data.frame(sanJRT0)
+row.names(sanJRT.m) <- sanJRT.m$station
+sanJRT.m <- sanJRT.m[,3:22]
+sanJRT_matrix <- data.matrix(sanJRT.m)
+
+heatmap(sanJRT_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlOrRd"), scale = "column")
+
+```
+
+
+

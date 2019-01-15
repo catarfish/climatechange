@@ -1,0 +1,1645 @@
+---
+title: "Downloading and Compiling CDEC temp sensor data"
+author: Vanessa Tobias (CDEC functions) & Brittany Davis (Compilation of temp data for CCS)
+  Project), additions by Catarina Pien
+date: "August 23, 2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+Clear the environment.
+```{r include = FALSE}
+rm(list=ls(all=TRUE))
+```
+
+
+The first function modifies the code from sharpshootR::CDECquery to download more data faster, using cdec4gov.water.ca.gov instead of the public CDEC download site. Note that this only works for computers on government IP addresses.
+
+```{r downloadfcn, message=FALSE}
+
+library(sharpshootR)
+
+#Run function
+CDEC4govquery <- function (id, sensor, interval = "D", start, end) 
+{
+  opt.original <- options(stringsAsFactors = FALSE)
+  if (missing(id) | missing(sensor) | missing(start) | missing(end)) 
+    stop("missing arguments", call. = FALSE)
+  u <- paste0("http://cdec4gov.water.ca.gov/cgi-progs/queryCSV?station_id=", 
+              id, "&sensor_num=", sensor, "&dur_code=", interval, "&start_date=", 
+              start, "&end_date=", end, "&data_wish=Download CSV Data Now")
+  u <- URLencode(u)
+  tf <- tempfile()
+  suppressWarnings(download.file(url = u, destfile = tf, quiet = TRUE))
+  d <- try(read.csv(file = tf, header = TRUE, skip = 1, quote = "'", 
+                    na.strings = "m", stringsAsFactors = FALSE, colClasses = c("character", 
+                                                                               "character", "numeric")), silent = TRUE)
+  if (class(d) == "try-error") {
+    d <- data.frame(d1= gsub("-", "", start), d2="0000", d3=NA)  #d has 3 columns
+  }
+  #if (nrow(d) == 0) 
+  #  stop("query returned no data", call. = FALSE)
+  d$datetime <- as.POSIXct(paste(d[[1]], d[[2]]), format = "%Y%m%d %H%M")
+  d[[1]] <- NULL
+  d[[1]] <- NULL
+  names(d)[1] <- paste("s", sensor, sep="")
+  return(d[, c("datetime", paste("s", sensor, sep=""))])
+}
+
+```
+
+This next function CDECcompyrs downloads all available data for a specified station, sensor, and range of years supplied by the user. This function specifies event (15-minute) data
+
+```{r eventfcn, message=FALSE}
+
+library(data.table)
+
+#run function that will actually grab and return sensor data
+CDECcompyrs <- function(first.year, last.year, station, sensor)
+{
+  yr.list <- seq(first.year, last.year, by=1)
+  for(k in yr.list)
+  {
+    assign(paste(station, sensor, k, sep="."),
+           CDEC4govquery(id=station, sensor=sensor, interval='E', 
+                         start=paste(k, "-01-01", sep=""), 
+                         end=paste(k, "-12-31", sep="")))
+  }
+  return(rbindlist(lapply(paste(station, sensor, yr.list, sep="."), function(x) get(x))))
+}
+
+```
+
+This function is the same as above, but downloads hourly data (interval changed to H)
+```{r hourlyfcn, message = FALSE}
+
+library(data.table)
+
+#run function that will actually grab and return sensor data
+CDECcompyrs_H <- function(first.year, last.year, station, sensor)
+{
+  yr.list <- seq(first.year, last.year, by=1)
+  for(k in yr.list)
+  {
+    assign(paste(station, sensor, k, sep="."),
+           CDEC4govquery(id=station, sensor=sensor, interval='H', 
+                         start=paste(k, "-01-01", sep=""), 
+                         end=paste(k, "-12-31", sep="")))
+  }
+  return(rbindlist(lapply(paste(station, sensor, yr.list, sep="."), function(x) get(x))))
+}
+
+```
+
+After running the above two functions Vanessa set up, let's use it for compiling all the temperature datasets we want to include in the climate change synthesis datasets. 
+
+We likely want to grab all the historical data available if it is there. The code will grab what is available based on inputted dates, and insert "NA" for other dates. 
+Below isthe code for stations in Fahrenheit (sensor = 25)
+
+```{r FahrenheitRaw, message=FALSE, warning = FALSE, include = FALSE}
+
+#Start code for Climate Change Synthesis Data Compilation
+
+library(dplyr)
+library(lubridate)
+library(readr)
+
+#Run the function "CDECcompyrs" from above for stations with 15 min temp events.
+# To find the start date, look up metadata at http://cdec.water.ca.gov/dynamicapp/staMeta?
+
+# Delta stations 
+
+#Bacon Island at Old River
+BAC_r <- CDECcompyrs(2008,2018,"BAC",25)
+#add new column with station ID name
+BAC_r$station="BAC"
+#write the file "BAC_r"
+write_csv(BAC_r, "station_files/stations_raw/BAC_r.csv")
+
+#Bethel Island
+BET_r=CDECcompyrs(2006,2018,"BET",25)
+BET_r$station="BET"
+write_csv(BET_r, "station_files/stations_raw/BET_r.csv")
+
+#Blind Point
+BLP_r=CDECcompyrs(2010,2018,"BLP",25)
+BLP_r$station="BLP"
+write_csv(BLP_r, "station_files/stations_raw/BLP_r.csv")
+
+#Collinsville on Sacramento River
+CSE_r=CDECcompyrs(2009,2018,"CSE",25)
+CSE_r$station="CSE"
+write_csv(CSE_r, "staton_files/stations_raw/CSE_r.csv")
+
+#Cygnus- Cordelia Slough
+CYG_r=CDECcompyrs(2009,2018,"CYG",25)
+CYG_r$station="CYG"
+write_csv(CYG_r, "station_files/stations_raw/CYG_r.csv")
+
+#False River near Oakley
+FAL_r=CDECcompyrs(2007,2018,"FAL",25)
+FAL_r$station="FAL"
+write_csv(FAL_r, "station_files/stations_raw/FAL_r.csv")
+
+#Goodyear Slough Outfall @ Naval Fleet
+FLT_r=CDECcompyrs(2010,2018,"FLT",25)
+FLT_r$station="FLT"
+write_csv(FLT_r, "station_files/stations_raw/FLT_r.csv")
+
+#Frank's Tract Mid tract
+FRK_r=CDECcompyrs(2009,2018,"FRK",25)
+FRK_r$station="FRK"
+write_csv(FRK_r, "station_files/stations_raw/FRK_r.csv")
+
+#Godfather II on Suisun Slough
+GOD_r=CDECcompyrs(2010,2018,"GOD",25)
+GOD_r$station="GOD"
+write_csv(GOD_r, "station_files/stations_raw/GOD_r.csv")
+
+#Goodyear Slough
+GYS_r=CDECcompyrs(2009,2018,"GYS",25)
+GYS_r$station="GYS"
+write_csv(GYS_r, "station_files/stations_raw/GYS_r.csv")
+
+#Grizzly Bay
+GZL_r=CDECcompyrs(2015,2018,"GZL",25)
+GZL_r$station="GZL"
+write_csv(GZL_r, "station_files/stations_raw/GZL_r.csv")
+
+#Grizzly Bay Buoy
+GZB_r=CDECcompyrs(2018,2018,"GZB",25)
+GZB_r$station="GZB"
+write_csv(GZB_r, "station_files/stations_raw/GZB_r.csv")
+
+#Honker Bay
+HON_r=CDECcompyrs(2015,2018,"HON",25)
+HON_r$station="HON"
+write_csv(HON_r, "station_files/stations_raw/HON_r.csv")
+
+#Hunter Cut at Montezuma Slough
+HUN_r=CDECcompyrs(2009,2018,"HUN",25)
+HUN_r$station="HUN"
+write_csv(HUN_r, "station_files/stations_raw/HUN_r.csv")
+
+#IBIS
+IBS_r=CDECcompyrs(2004,2018,"IBS",25)
+IBS_r$station="IBS"
+write_csv(IBS_r, "station_files/stations_raw/IBS_r.csv")
+
+#Middle River at Middle River
+MDM_r=CDECcompyrs(2009,2018,"MDM",25)
+MDM_r$station="MDM"
+write_csv(MDM_r, "station_files/stations_raw/MDM_r.csv")
+
+#Middle River near Howard Road Bridge
+MHO_r=CDECcompyrs(2010,2018,"MHO",25)
+MHO_r$station="MHO"
+write_csv(MHO_r, "station_files/stations_raw/MHO_r.csv")
+
+#Montezuma Slough at Roaring R
+MSL_r=CDECcompyrs(2009,2018,"MSL",25)
+MSL_r$station="MSL"
+write_csv(MSL_r, "station_files/stations_raw/MSL_r.csv")
+
+#Old River at Bacon Island
+OBI_r=CDECcompyrs(2008,2018,"OBI",25)
+OBI_r$station="OBI"
+write_csv(OBI_r, "station_files/stations_raw/OBI_r.csv")
+
+#Old River at Delta Mendota Canal
+ODM_r=CDECcompyrs(2009,2018,"ODM",25)
+ODM_r$station="ODM"
+write_csv(ODM_r, "station_files/stations_raw/ODM_r.csv")
+
+#Old River at Franks Tract near Terminous
+OSJ_r=CDECcompyrs(2006,2018,"OSJ",25)
+OSJ_r$station="OSJ"
+write_csv(OSJ_r, "station_files/stations_raw/OSJ_r.csv")
+
+#Old River at Highway 4
+OH4_r=CDECcompyrs(2009,2018,"OH4",25)
+OH4_r$station="OH4"
+write_csv(OH4_r, "station_files/stations_raw/OH4_r.csv")
+
+#Old River near Tracy
+OLD_r=CDECcompyrs(2005,2018,"OLD",25)
+OLD_r$station="OLD"
+write_csv(OLD_r, "station_files/stations_raw/OLD_r.csv")
+
+#Paradise Cut above Old River
+PCO_r=CDECcompyrs(2012,2018,"PCO",25)
+PCO_r$station="PCO"
+write_csv(PCO_r, "station_files/stations_raw/PCO_r.csv")
+
+#Prisoners Point
+PPT_r=CDECcompyrs(1997,2018,"PPT",25)
+PPT_r$station="PPT"
+write_csv(PPT_r, "station_files/stations_raw/PPT_r.csv")
+
+#Roaring River
+ROR_r=CDECcompyrs(2009,2018,"ROR",25)
+ROR_r$station="ROR"
+write_csv(ROR_r, "station_files/stations_raw/ROR_r.csv")
+
+#Rock Slough above Contra Costa
+RSL_r=CDECcompyrs(2012,2018,"RSL",25)
+RSL_r$station="RSL"
+write_csv(RSL_r, "station_files/stations_raw/RSL_r.csv")
+
+#Sugar Cut
+SUR_r=CDECcompyrs(2012,2018,"SUR",25)
+SUR_r$station="SUR"
+write_csv(SUR_r, "station_files/stations_raw/SUR_r.csv")
+
+#Suisun Bay - cutoff near Ryer
+RYC_r=CDECcompyrs(2015,2018,"RYC",25)
+RYC_r$station="RYC"
+write_csv(RYC_r, "station_files/stations_raw/RYC_r.csv")
+
+#Sunrise Club
+SNC_r=CDECcompyrs(2009,2018,"SNC",25)
+SNC_r$station="SNC"
+write_csv(SNC_r, "station_files/stations_raw/SNC_r.csv")
+
+#Teal Club at Frank Horan Slough 
+TEA_r=CDECcompyrs(2010,2018,"TEA",25)
+TEA_r$station="TEA"
+write_csv(TEA_r, "station_files/stations_raw/TEA_r.csv")
+
+#Victoria Island Near Byron
+VCU_r=CDECcompyrs(2006,2018,"VCU",25)
+VCU_r$station="VCU"
+write_csv(VCU_r, "station_files/stations_raw/VCU_r.csv")
+
+#Volanti
+VOL_r=CDECcompyrs(2000,2018,"VOL",25)
+VOL_r$station="VOL"
+write_csv(VOL_r, "station_files/stations_raw/VOL_r.csv")
+
+#### Non-Delta
+
+#San Joaquin River at Antioch
+ANH_r=CDECcompyrs(2008,2018,"ANH",25)
+ANH_r$station="ANH"
+write_csv(ANH_r, "station_files/stations_raw/ANH_r.csv")
+
+#Beldon Landing
+BDL_r=CDECcompyrs(2009,2018,"BDL",25)
+BDL_r$station="BDL"
+write_csv(BDL_r, "station_files/stations_raw/BDL_r.csv")
+
+#San Joaquin R at Brandt Bridge
+BDT_r=CDECcompyrs(2005,2018,"BDT",25)
+BDT_r$station="BDT"
+write_csv(BDT_r, "station_files/stations_raw/BDT_r.csv")
+
+#Middle R at Bacon Island Rd
+BIR_r=CDECcompyrs(2018,2018,"BIR",25)
+BIR_r$station="BIR"
+write_csv(BIR_r, "station_files/stations_raw/BIR_r.csv")
+
+#Blacklock (NE1)
+BLL_r=CDECcompyrs(2009,2018,"BLL",25)
+BLL_r$station="BLL"
+write_csv(BLL_r, "station_files/stations_raw/BLL_r.csv")
+
+#Doughty Cut above Grant Line Canal
+DGL_r=CDECcompyrs(2006,2018,"DGL",25)
+DGL_r$station="DGL"
+write_csv(DGL_r, "station_files/stations_raw/DGL_r.csv")
+
+#Delta Cross Channel btw Sac & Snodgrass
+DLC_r=CDECcompyrs(2009,2018,"DLC",25)
+DLC_r$station="DLC"
+write_csv(DLC_r, "station_files/stations_raw/DLC_r.csv")
+
+#Dutch Slough at Jersey Island
+DSJ_r=CDECcompyrs(2009,2018,"DSJ",25)
+DSJ_r$station="DSJ"
+write_csv(DSJ_r, "station_files/stations_raw/DSJ_r.csv")
+
+#Deep water ship channel
+DWS_r=CDECcompyrs(2011,2018,"DWS",25)
+DWS_r$station="DWS"
+write_csv(DWS_r, "station_files/stations_raw/DWS_r.csv")
+
+#Fishermans Cut
+FCT_r=CDECcompyrs(2015,2018,"FCT",25)
+FCT_r$station="FCT"
+write_csv(FCT_r, "station_files/stations_raw/FCT_r.csv")
+
+#Sacramento River at Freeport
+FPT_r=CDECcompyrs(2009,2018,"FPT",25)
+FPT_r$station="FPT"
+write_csv(FPT_r, "station_files/stations_raw/FPT_r.csv")
+
+#Grantline Canal at Tracy Rd Bridge
+GCT_r=CDECcompyrs(2005,2018,"GCT",25)
+GCT_r$station="GCT"
+write_csv(GCT_r, "station_files/stations_raw/GCT_r.csv")
+
+#Sacramento River Below Georgiana Slough
+GES_r=CDECcompyrs(2009,2018,"GES",25)
+GES_r$station="GES"
+write_csv(GES_r, "station_files/stations_raw/GES_r.csv")
+
+#Grantline Canal (USGS)
+GLC_r=CDECcompyrs(2007,2018,"GLC",25)
+GLC_r$station="GLC"
+write_csv(GLC_r, "station_files/stations_raw/GLC_r.csv")
+
+#Grantline Canal East
+GLE_r=CDECcompyrs(2013,2018,"GLE",25)
+GLE_r$station="GLE"
+write_csv(GLE_r, "station_files/stations_raw/GLE_r.csv")
+
+#Green's Landing
+GLN_r=CDECcompyrs(1998,1999,"GLN",25)
+GLN_r$station="GLN"
+write_csv(GLN_r, "station_files/stations_raw/GLN_r.csv")
+
+#Georgiana Slough at Sacramento River
+GSS_r=CDECcompyrs(2009,2018,"GSS",25)
+GSS_r$station="GSS"
+write_csv(GSS_r, "station_files/stations_raw/GSS_r.csv")
+
+#MIddle River near Holt
+HLT=CDECcompyrs(2006,2018,"HLT",25)
+HLT$station="HLT"
+write_csv(HLT, "station_files/stations_raw/HLT.csv")
+
+#Holland Cut near Bethel Island
+HOL_r=CDECcompyrs(2006,2018,"HOL",25)
+HOL_r$station="HOL"
+write_csv(HOL_r, "station_files/stations_raw/HOL_r.csv")
+
+#Miner Slough at Hwy 84 Bridge
+HWB_r=CDECcompyrs(2009,2018,"HWB",25)
+HWB_r$station="HWB"
+write_csv(HWB_r, "station_files/stations_raw/HWB_r.csv")
+
+#Liberty Island @ Approx Cntr S end
+LIB_r=CDECcompyrs(2010,2018,"LIB",25)
+LIB_r$station="LIB"
+write_csv(LIB_r, "station_files/stations_raw/LIB_r.csv")
+
+#Lisbon sensor
+LIS_r=CDECcompyrs(2008,2018,"LIS",25)
+LIS_r$station="LIS"
+write_csv(LIS_r, "station_files/stations_raw/LIS_r.csv")
+
+#Little Potato Slough at Terminous 
+LPS_r=CDECcompyrs(2009,2018,"LPS",25)
+LPS_r$station="LPS"
+write_csv(LPS_r, "station_files/stations_raw/LPS_r.csv")
+
+#Middle River above Barrier 
+MAB_r=CDECcompyrs(2014,2018,"MAB",25)
+MAB_r$station="MAB"
+write_csv(MAB_r, "station_files/stations_raw/MAB_r.csv")
+
+#Sacramento River at Mallard Island
+MAL_r=CDECcompyrs(1986,2018,"MAL",25)
+MAL_r$station="MAL"
+write_csv(MAL_r, "station_files/stations_raw/MAL_r.csv")
+
+#Middle River at Howard Road Bridge
+MHR_r=CDECcompyrs(2006,2010,"MHR",25)
+MHR_r$station="MHR"
+write_csv(MHR_r, "station_files/stations_raw/MHR_r.csv")
+
+#Miner Slough near Sacramento River
+MIR_r=CDECcompyrs(2015,2018,"MIR",25)
+MIR_r$station="MIR"
+write_csv(MIR_r, "station_files/stations_raw/MIR_r.csv")
+
+#Martinez
+MRZ_r=CDECcompyrs(1994,2018,"MRZ",25)
+MRZ_r$station="MRZ"
+write_csv(MRZ_r, "station_files/stations_raw/MRZ_r.csv")
+
+#Mokelumne R @ San Joaquin River
+MOK_r=CDECcompyrs(2008,2018,"MOK",25)
+MOK_r$station="MOK"
+write_csv(MOK_r, "station_files/stations_raw/MOK_r.csv")
+
+#Middle River at Undine Road
+MRU_r=CDECcompyrs(2013,2018,"MRU",25)
+MRU_r$station="MRU"
+write_csv(MRU_r, "station_files/stations_raw/MRU_r.csv")
+
+#Middle River near Tracy Blvd 
+MRX_r=CDECcompyrs(2016,2018,"MRX",25)
+MRX_r$station="MRX"
+write_csv(MRX_r, "station_files/stations_raw/MRX_r.csv")
+
+#San Joaquin River at MOssdale Bridge 
+MSD_r=CDECcompyrs(2008,2018,"MSD",25)
+MSD_r$station="MSD"
+write_csv(MSD_r, "station_files/stations_raw/MSD_r.csv")
+
+#Middle River at Tracy Blvd
+MTB_r=CDECcompyrs(2002,2018,"MTB",25)
+MTB_r$station="MTB"
+write_csv(MTB_r, "station_files/stations_raw/MTB_r.csv")
+
+#Middle River at Union Point
+MUP_r=CDECcompyrs(2010,2018,"MUP",25)
+MUP_r$station="MUP"
+write_csv(MUP_r, "station_files/stations_raw/MUP_r.csv")
+
+#North Mokelumne R at W WalnutGrove Rd
+NMR_r=CDECcompyrs(2010,2018,"NMR",25)
+NMR_r$station="NMR"
+write_csv(NMR_r, "station_files/stations_raw/NMR_r.csv")
+
+#National Steel
+NSL_r=CDECcompyrs(2009,2018,"NSL",25)
+NSL_r$station="NSL"
+write_csv(NSL_r, "station_files/stations_raw/NSL_r.csv")
+
+#Old River near DMC above Dam
+OAD_r=CDECcompyrs(2006,2017,"OAD",25)
+OAD_r$station="OAD"
+write_csv(OAD_r, "station_files/stations_raw/OAD_r.csv")
+
+#Old River near DMC below Dam
+OBD_r=CDECcompyrs(2006,2010,"OBD",25)
+OBD_r$station="OBD"
+write_csv(OBD_r, "station_files/stations_raw/OBD_r.csv")
+
+#Old River at head
+OH1_r=CDECcompyrs(1999,2018,"OH1",25)
+OH1_r$station="OH1"
+write_csv(OH1_r, "station_files/stations_raw/OH1_r.csv")
+
+#Old River at Clifton Court intake
+ORI_r=CDECcompyrs(2011,2018,"ORI",25)
+ORI_r$station="ORI"
+write_csv(ORI_r, "station_files/stations_raw/ORI_r.csv")
+
+#Old River upstream of Mountain House creek
+ORM_r=CDECcompyrs(2015,2018,"ORM",25)
+ORM_r$station="ORM"
+write_csv(ORM_r, "station_files/stations_raw/ORM_r.csv")
+
+#Old River @ Quimbly isl near Bethel isl
+ORQ_r=CDECcompyrs(2006,2018,"ORQ",25)
+ORQ_r$station="ORQ"
+write_csv(ORQ_r, "station_files/stations_raw/ORQ_r.csv")
+
+#Old River above Doughty Cut
+ORX_r=CDECcompyrs(2013,2018,"ORX",25)
+ORX_r$station="ORX"
+write_csv(ORX_r, "station_files/stations_raw/ORX_r.csv")
+
+#Paradise Cut
+PDC_r=CDECcompyrs(2014,2018,"PDC",25)
+PDC_r$station="PDC"
+write_csv(PDC_r, "station_files/stations_raw/PDC_r.csv")
+
+#San Joaquin R at Prisoners Pt nr Terminous
+PRI_r=CDECcompyrs(2006,2018,"PRI",25)
+PRI_r$station="PRI"
+write_csv(PRI_r, "station_files/stations_raw/PRI_r.csv")
+
+#Stanislaus River at Ripon
+RIP=CDECcompyrs(2011,2018,"RIP",25)
+RIP$station="RIP"
+write_csv(RIP, "station_files/stations_raw/RIP.csv")
+
+#Rough and Ready Island
+RRI_r=CDECcompyrs(2000,2018,"RRI",25)
+RRI_r$station="RRI"
+write_csv(RRI_r, "station_files/stations_raw/RRI_r.csv")
+
+#Sacramento River at Rio Vista Bridge
+RVB_r=CDECcompyrs(2008,2018,"RVB",25)
+RVB_r$station="RVB"
+write_csv(RVB_r, "station_files/stations_raw/RVB_r.csv")
+
+#Cache Slough at Ryer Island
+RYI_r=CDECcompyrs(2009,2018,"RYI",25)
+RYI_r$station="RYI"
+write_csv(RYI_r, "station_files/stations_raw/RYI_r.csv")
+
+#Stanislaus R before Conf of San Joaquin
+SBC_r=CDECcompyrs(2001,2004,"SBC",25)
+SBC_r$station="SBC"
+write_csv(SBC_r, "station_files/stations_raw/SBC_r.csv")
+
+#Sacramento River at Decker Island
+SDI_r=CDECcompyrs(2010,2018,"SDI",25)
+SDI_r$station="SDI"
+write_csv(SDI_r, "station_files/stations_raw/SDI_r.csv")
+
+#Sugar Cut
+SGA_r=CDECcompyrs(2014,2018,"SGA",25)
+SGA_r$station="SGA"
+write_csv(SGA_r, "station_files/stations_raw/SGA_r.csv")
+
+#San Joaquin R near Buckley Cove
+SJC_r=CDECcompyrs(2018,2018,"SJC",25)
+SJC_r$station="SJC"
+write_csv(SJC_r, "station_files/stations_raw/SJC_r.csv")
+
+#San Joaquin R above Dos Reis
+SJD_r=CDECcompyrs(2013,2018,"SJD",25)
+SJD_r$station="SJD"
+write_csv(SJD_r, "station_files/stations_raw/SJD_r.csv")
+
+#San Joaquin R at Garwood Bridge
+SJG_r=CDECcompyrs(2009,2018,"SJG",25)
+SJG_r$station="SJG"
+write_csv(SJG_r, "station_files/stations_raw/SJG_r.csv")
+
+#San Joaquin R at  Jersey Point
+SJJ=CDECcompyrs(2009,2018,"SJJ",25)
+SJJ$station="SJJ"
+write_csv(SJJ, "station_files/stations_raw/SJJ.csv")
+
+#San Joaquin R below Old R near Lathrop
+SJL_r=CDECcompyrs(2006,2018,"SJL",25)
+SJL_r$station="SJL"
+write_csv(SJL_r, "station_files/stations_raw/SJL_r.csv")
+
+#San Joaquin R McCune station near Vernalis
+SJR_F_r=CDECcompyrs(2008,2018,"SJR",25)
+SJR_F_r$station="SJR"
+write_csv(SJR_F_r, "station_files/stations_raw/SJR_F_r.csv")
+
+#South Mokelumne R at W Walnut Grove Road
+SMR_r=CDECcompyrs(2010,2018,"SMR",25)
+SMR_r$station="SMR"
+write_csv(SMR_r, "station_files/stations_raw/SMR_r.csv")
+
+#Sacramento River downstream of Isleton
+SOI_r=CDECcompyrs(2015,2018,"SOI",25)
+SOI_r$station="SOI"
+write_csv(SOI_r, "station_files/stations_raw/SOI_r.csv")
+
+#Sacramento River at Hood
+SRH_r=CDECcompyrs(2008,2018,"SRH",25)
+SRH_r$station="SRH"
+write_csv(SRH_r, "station_files/stations_raw/SRH_r.csv")
+
+#Sacramento River at Rio Vista
+SRV_r=CDECcompyrs(2009,2018,"SRV",25)
+SRV_r$station="SRV"
+write_csv(SRV_r, "station_files/stations_raw/SRV_r.csv")
+
+#Sacramento R near Sherman Island
+SSI_r=CDECcompyrs(2015,2018,"SSI",25)
+SSI_r$station="SSI"
+write_csv(SSI_r, "station_files/stations_raw/SSI_r.csv")
+
+#Steamboat Slough btw Sac R and Sutter Sl
+SSS_r=CDECcompyrs(2014,2018,"SSS",25)
+SSS_r$station="SSS"
+write_csv(SSS_r, "station_files/stations_raw/SSS_r.csv")
+
+#Sutter Slough at Courtland
+SUT_r=CDECcompyrs(2014,2018,"SUT",25)
+SUT_r$station="SUT"
+write_csv(SUT_r, "station_files/stations_raw/SUT_r.csv")
+
+#Steamboat Slough nr Sacramento R
+SXS_r=CDECcompyrs(2015,2018,"SXS",25)
+SXS_r$station="SXS"
+write_csv(SXS_r, "station_files/stations_raw/SXS_r.csv")
+
+#Three Mile Slough
+TMS_r=CDECcompyrs(2006,2018,"TMS",25)
+TMS_r$station="TMS"
+write_csv(TMS_r, "station_files/stations_raw/TMS_r.csv")
+
+#Tom Paine Slough abv intake structure
+TPI_r=CDECcompyrs(2004,2018,"TPI",25)
+TPI_r$station="TPI"
+write_csv(TPI_r, "station_files/stations_raw/TPI_r.csv")
+
+#Tom Paine Slough abv the mouth
+TPS_r=CDECcompyrs(2004,2018,"TPS",25)
+TPS_r$station="TPS"
+write_csv(TPS_r, "station_files/stations_raw/TPS_r.csv")
+
+#Turner Cut near Holt
+TRN_r=CDECcompyrs(2006,2018,"TRN",25)
+TRN_r$station="TRN"
+write_csv(TRN_r, "station_files/stations_raw/TRN_r.csv")
+
+#Threemile slough at San Joaquin R
+TSL_r=CDECcompyrs(2008,2018,"TSL",25)
+TSL_r$station="TSL"
+write_csv(TSL_r, "station_files/stations_raw/TSL_r.csv")
+
+#Old River at Tracy Wildlife Association
+TWA_r=CDECcompyrs(2011,2018,"TWA",25)
+TWA_r$station="TWA"
+write_csv(TWA_r, "station_files/stations_raw/TWA_r.csv")
+
+#San Joaquin River at Twitchell Island
+TWI_r=CDECcompyrs(2015,2018,"TWI",25)
+TWI_r$station="TWI"
+write_csv(TWI_r, "station_files/stations_raw/TWI_r.csv")
+
+#West Canal at Clifton Court intake
+WCI_r=CDECcompyrs(2011,2018,"WCI",25)
+WCI_r$station="WCI"
+write_csv(WCI_r, "station_files/stations_raw/WCI_r.csv")
+
+```
+
+Below are stations already in Celsius (Sensor = 146)
+```{r CelsiusRaw, message = FALSE, include= FALSE}
+library(dplyr)
+library(lubridate)
+library(readr)
+
+# Celsius Stations - event
+#Drainage at Arbor Road
+DAR_r=CDECcompyrs(2016,2018,"DAR",146)
+DAR_r$station="DAR"
+write_csv(DAR_r, "station_files/stations_raw/DAR_r.csv")
+
+#East Contra County ID PP#1
+ECD_r=CDECcompyrs(2013,2018,"ECD",146)
+ECD_r$station="ECD"
+write_csv(ECD_r, "station_files/stations_raw/ECD_r.csv")
+
+#NF Mokelumne R blw Snodgrass Slough
+MKN_r=CDECcompyrs(2009,2018,"MKN",146)
+MKN_r$station="MKN"
+write_csv(MKN_r, "station_files/stations_raw/MKN_r.csv")
+
+#Three Mile Slough at San Joaquin R
+SR3_r=CDECcompyrs(2016,2018,"SR3",146)
+SR3_r$station="SR3"
+write_csv(SR3_r, "station_files/stations_raw/SR3_r.csv")
+
+#Steamboat Slough blw Sutter Slough
+SUS_r=CDECcompyrs(2015,2018,"SUS",146)
+SUS_r$station="SUS"
+write_csv(SUS_r, "station_files/stations_raw/SUS_r.csv")
+
+#Sacramento River at Walnut Grove EC
+SWE_r=CDECcompyrs(2015,2018,"SWE",146)
+SWE_r$station="SWE"
+write_csv(SWE_r, "station_files/stations_raw/SWE_r.csv")
+
+#San Joaquin River near Vernalis
+VNS_r=CDECcompyrs(2014,2018,"VNS",146)
+VNS_r$station="VNS"
+write_csv(VNS_r, "station_files/stations_raw/VNS_r.csv")
+
+# Stations that have both F and C data
+#San Joaquin R McCune Station nr Vernalis
+SJR_C_r=CDECcompyrs(2005,2008,"SJR",146)
+SJR_C_r$station="SJR"
+write_csv(SJR_C_r, "station_files/stations_raw/SJR_C_r.csv")
+
+
+```
+
+Moving on from downloading data off the web. 
+
+Now we will standardize all the files so they all have the same column names: datetime, station, Temp. All temperatures will be in Celsius.
+
+Load raw files, convert fahrenheit to celsius, then merge stations into station_files/stations_std/merged_std folder
+
+```{r standardizeMerge}
+library(dplyr)
+library(lubridate)
+library(readr)
+
+#### Celsius stations ####
+DAR_r <- read_csv("station_files/stations_raw/DAR_r.csv")
+ECD_r <- read_csv("station_files/stations_raw/ECD_r.csv")
+MKN_r <- read_csv("station_files/stations_raw/MKN_r.csv")
+SR3_r <- read_csv("station_files/stations_raw/SR3_r.csv")
+SUS_r <- read_csv("station_files/stations_raw/SUS_r.csv")
+SWE_r <- read_csv("station_files/stations_raw/SWE_r.csv")
+VNS_r <- read_csv("station_files/stations_raw/VNS_r.csv")
+SJR_C_r <- read_csv("station_files/stations_raw/SJR_C_r.csv")
+
+# Merge celsius stations and write file.
+celsius_r <- rbind(DAR_r, ECD_r, MKN_r, SR3_r, SUS_r, SWE_r, VNS_r, SJR_C_r)
+write_csv(celsius_r, "station_files/stations_raw/merged/celsius_e_r.csv")
+
+# Create standardized "Temp" column to merge later, then delete s146 station. 
+celsius_r$s146 <- as.numeric(celsius_r$s146)
+celsius_r$Temp <- celsius_r$s146
+celsius_std <- celsius_r[,c(1,3,4)]
+write_csv(celsius_std, "station_files/stations_std/merged_std/celsius_e_std.csv")
+
+##############################
+#### Delta/ East Bay/ Mokelumne ####
+
+#Load all the temperature stations
+BAC_r <- read_csv("station_files/stations_raw/BAC_r.csv")
+BET_r <- read_csv("station_files/stations_raw/BET_r.csv")
+BLP_r <- read_csv("station_files/stations_raw/BLP_r.csv")
+CSE_r <- read_csv("station_files/stations_raw/CSE_r.csv")
+CYG_r <- read_csv("station_files/stations_raw/CYG_r.csv")
+ECD_r <- read_csv("station_files/stations_raw/ECD_r.csv") # celsius only
+FAL_r <- read_csv("station_files/stations_raw/FAL_r.csv")
+FLT_r <- read_csv("station_files/stations_raw/FLT_r.csv")
+FRK_r <- read_csv("station_files/stations_raw/FRK_r.csv")
+GOD_r <- read_csv("station_files/stations_raw/GOD_r.csv")
+GYS_r <- read_csv("station_files/stations_raw/GYS_r.csv")
+GZB_r <- read_csv("station_files/stations_raw/GZB_r.csv")
+GZL_r <- read_csv("station_files/stations_raw/GZL_r.csv")
+HON_r <- read_csv("station_files/stations_raw/HON_r.csv")
+HUN_r <- read_csv("station_files/stations_raw/HUN_r.csv")
+IBS_r <- read_csv("station_files/stations_raw/IBS_r.csv")
+MDM_r <- read_csv("station_files/stations_raw/MDM_r.csv")
+MHO_r <- read_csv("station_files/stations_raw/MHO_r.csv")
+MSL_r <- read_csv("station_files/stations_raw/MSL_r.csv")
+OBI_r <- read_csv("station_files/stations_raw/OBI_r.csv")
+ODM_r <- read_csv("station_files/stations_raw/ODM_r.csv")
+OH4_r <- read_csv("station_files/stations_raw/OH4_r.csv")
+OLD_r <- read_csv("station_files/stations_raw/OLD_r.csv")
+OSJ_r <- read_csv("station_files/stations_raw/OSJ_r.csv")
+PCO_r <- read_csv("station_files/stations_raw/PCO_r.csv")
+PPT_r <- read_csv("station_files/stations_raw/PPT_r.csv")
+ROR_r <- read_csv("station_files/stations_raw/ROR_r.csv")
+RSL_r <- read_csv("station_files/stations_raw/RSL_r.csv")
+RYC_r <- read_csv("station_files/stations_raw/RYC_r.csv")
+SNC_r <- read_csv("station_files/stations_raw/SNC_r.csv")
+SUR_r <- read_csv("station_files/stations_raw/SUR_r.csv")
+TEA_r <- read_csv("station_files/stations_raw/TEA_r.csv")
+VCU_r <- read_csv("station_files/stations_raw/VCU_r.csv")
+VOL_r <- read_csv("station_files/stations_raw/VOL_r.csv")
+
+##### East Bay/ Mokelumne ####
+MRZ_r <- read_csv("station_files/stations_raw/MRZ_r.csv")
+MKN_r <- read_csv("station_files/stations_raw/MKN_r.csv") # celsius only
+MOK_r <- read_csv("station_files/stations_raw/MOK_r.csv")
+NMR_r <- read_csv("station_files/stations_raw/NMR_r.csv")
+SMR_r <- read_csv("station_files/stations_raw/SMR_r.csv")
+
+#Bind all the temperature sensors together into a single dataframe 
+delta_r <- rbind(BAC_r, BET_r, BLP_r, CSE_r, CYG_r, FAL_r, FLT_r, FRK_r,
+            GOD_r, GYS_r, GZB_r, GZL_r, HON_r, HUN_r, IBS_r, MDM_r, MHO_r, MSL_r,
+            OBI_r, ODM_r, OH4_r, OLD_r, OSJ_r, PCO_r, PPT_r, ROR_r, RSL_r, RYC_r, 
+            SNC_r, SUR_r, TEA_r, VCU_r, VOL_r,
+            MRZ_r, MOK_r, NMR_r, SMR_r)
+write_csv(delta_r, "station_files/stations_raw/merged/delta_e_r.csv")
+
+#make a new column and convert temperature from fahrenheit to celsius
+delta_r$s25 <- as.numeric(delta_r$s25)
+delta_r$Temp <- ((delta_r$s25)-32)/1.8
+delta_r$Temp <- round(delta_std$Temp, digits = 1)
+
+# make standardized dataset (remove s25 column)
+delta_std <- delta_r[,c(1,3,4)]
+write_csv(delta_std, "station_files/stations_std/merged_std/delta_e_std.csv")
+
+# MKN and ECD are in celsius and will eventually be merged in
+
+#####################
+### Sacramento River ####
+
+#Read individual station files
+BDL_r <- read_csv("station_files/stations_raw/BDL_r.csv")
+BLL_r <- read_csv("station_files/stations_raw/BLL_r.csv")
+DLC_r <- read_csv("station_files/stations_raw/DLC_r.csv")
+DWS_r <- read_csv("station_files/stations_raw/DWS_r.csv")
+FPT_r <- read_csv("station_files/stations_raw/FPT_r.csv")
+GES_r <- read_csv("station_files/stations_raw/GES_r.csv")
+GLN_r <- read_csv("station_files/stations_raw/GLN_r.csv")
+GSS_r <- read_csv("station_files/stations_raw/GSS_r.csv")
+HWB_r <- read_csv("station_files/stations_raw/HWB_r.csv")
+LIB_r <- read_csv("station_files/stations_raw/LIB_r.csv")
+LIS_r <- read_csv("station_files/stations_raw/LIS_r.csv")
+MAL_r <- read_csv("station_files/stations_raw/MAL_r.csv")
+MIR_r <- read_csv("station_files/stations_raw/MIR_r.csv")
+NSL_r <- read_csv("station_files/stations_raw/NSL_r.csv")
+RVB_r <- read_csv("station_files/stations_raw/RVB_r.csv")
+RYI_r <- read_csv("station_files/stations_raw/RYI_r.csv")
+SDI_r <- read_csv("station_files/stations_raw/SDI_r.csv")
+SOI_r <- read_csv("station_files/stations_raw/SOI_r.csv")
+SRH_r <- read_csv("station_files/stations_raw/SRH_r.csv")
+SRV_r <- read_csv("station_files/stations_raw/SRV_r.csv")
+SSI_r <- read_csv("station_files/stations_raw/SSI_r.csv")
+SSS_r <- read_csv("station_files/stations_raw/SSS_r.csv")
+SUS_r <- read_csv("station_files/stations_raw/SUS_r.csv") # celsius only
+SUT_r <- read_csv("station_files/stations_raw/SUT_r.csv")
+SWE_r <- read_csv("station_files/stations_raw/SWE_r.csv") # celsius only
+SXS_r <- read_csv("station_files/stations_raw/SXS_r.csv")
+TMS_r <- read_csv("station_files/stations_raw/TMS_r.csv")
+TSL_r <- read_csv("station_files/stations_raw/TSL_r.csv")
+
+# Bind stations together
+sacR_r=rbind(BDL_r, BLL_r, DLC_r, DWS_r, FPT_r, GES_r, GLN_r, GSS_r, HWB_r, LIB_r, LIS_r, 
+           MAL_r, MIR_r, NSL_r, RVB_r, RYI_r, SDI_r,
+           SOI_r, SRH_r, SRV_r, SSI_r, SSS_r, SUT_r, SXS_r, TMS_r, TSL_r)
+write_csv(sacR_r, "station_files/stations_raw/merged/sacR_e_r.csv")
+
+#make a new column and convert temperature from farenheit to celsius
+sacR_r$s25 <- as.numeric(sacR_r$s25)
+sacR_r$Temp=((sacR_r$s25)-32)/1.8
+sacR_r$Temp <- round(sacR_std$Temp, digits = 1)
+
+# write csv for Sac River stations (sacR0)
+sacR_std <- sacR_r[,c(1,3,4)]
+write_csv(sacR_std, "station_files/stations_std/merged_std/sacR_e_std.csv")
+
+
+#SUS, SWE are in here but celsius, need to eventually merge in
+
+#######################
+### San Joaquin River ####
+
+ANH_r <- read_csv("station_files/stations_raw/ANH_r.csv")
+BDT_r <- read_csv("station_files/stations_raw/BDT_r.csv")
+BIR_r <- read_csv("station_files/stations_raw/BIR_r.csv")
+DGL_r <- read_csv("station_files/stations_raw/DGL_r.csv")
+DSJ_r <- read_csv("station_files/stations_raw/DSJ_r.csv")
+FCT_r <- read_csv("station_files/stations_raw/FCT_r.csv")
+GCT_r <- read_csv("station_files/stations_raw/GCT_r.csv")
+GLC_r <- read_csv("station_files/stations_raw/GLC_r.csv")
+GLE_r <- read_csv("station_files/stations_raw/GLE_r.csv")
+HLT_r <- read_csv("station_files/stations_raw/HLT_r.csv")
+HOL_r <- read_csv("station_files/stations_raw/HOL_r.csv")
+LPS_r <- read_csv("station_files/stations_raw/LPS_r.csv")
+MAB_r <- read_csv("station_files/stations_raw/MAB_r.csv")
+MHR_r <- read_csv("station_files/stations_raw/MHR_r.csv")
+MRU_r <- read_csv("station_files/stations_raw/MRU_r.csv")
+MRX_r <- read_csv("station_files/stations_raw/MRX_r.csv")
+MSD_r <- read_csv("station_files/stations_raw/MSD_r.csv")
+MTB_r <- read_csv("station_files/stations_raw/MTB_r.csv")
+MUP_r <- read_csv("station_files/stations_raw/MUP_r.csv")
+OAD_r <- read_csv("station_files/stations_raw/OAD_r.csv")
+OBD_r <- read_csv("station_files/stations_raw/OBD_r.csv")
+OH1_r <- read_csv("station_files/stations_raw/OH1_r.csv")
+ORI_r <- read_csv("station_files/stations_raw/ORI_r.csv")
+ORM_r <- read_csv("station_files/stations_raw/ORM_r.csv")
+ORQ_r <- read_csv("station_files/stations_raw/ORQ_r.csv")
+ORX_r <- read_csv("station_files/stations_raw/ORX_r.csv")
+PDC_r <- read_csv("station_files/stations_raw/PDC_r.csv")
+PRI_r <- read_csv("station_files/stations_raw/PRI_r.csv")
+RRI_r <- read_csv("station_files/stations_raw/RRI_r.csv")
+SGA_r <- read_csv("station_files/stations_raw/SGA_r.csv")
+SJC_r <- read_csv("station_files/stations_raw/SJC_r.csv")
+SJD_r <- read_csv("station_files/stations_raw/SJD_r.csv")
+SJG_r <- read_csv("station_files/stations_raw/SJG_r.csv")
+SJJ_r <- read_csv("station_files/stations_raw/SJJ_r.csv")
+SJL_r <- read_csv("station_files/stations_raw/SJL_r.csv")
+SJR_F_r <- read_csv("station_files/stations_raw/SJR_F_r.csv")
+TPI_r <- read_csv("station_files/stations_raw/TPI_r.csv")
+TRN_r <- read_csv("station_files/stations_raw/TRN_r.csv")
+TWA_r <- read_csv("station_files/stations_raw/TWA_r.csv")
+TWI_r <- read_csv("station_files/stations_raw/TWI_r.csv")
+WCI_r <- read_csv("station_files/stations_raw/WCI_r.csv")
+RIP_r <- read_csv("station_files/stations_raw/RIP_r.csv") # Stanislaus River
+
+sanJR_r <- rbind(ANH_r, BDT_r, BIR_r, DSJ_r, DGL_r, FCT_r, GCT_r, GLC_r, GLE_r, 
+          HLT_r, HOL_r, LPS_r, MAB_r, MHR_r, MRU_r, MRX_r, MSD_r, MTB_r, MUP_r, 
+          OAD_r, OBD_r, OH1_r, ORI_r, ORM_r, ORQ_r, ORX_r, PDC_r, PRI_r, 
+          RRI_r, SGA_r, SJC_r, SJD_r, SJG_r, SJJ_r, SJL_r, SJR_r, TPI_r, 
+          TRN_r, TWA_r, TWI_r, WCI_r, RIP_r)
+write_csv(sanJR_r, "station_files/stations_raw/merged/sanJR_e_r.csv")
+
+#make a new column and convert temperature from farenheit to celsius
+sanJR_r$s25 <- as.numeric(sanJR_r$s25)
+sanJR_r$Temp <- ((sanJR_r$s25)-32)/1.8
+sanJR_r$Temp <- round(sanJR_std$Temp, digits = 1)
+
+# write file
+sanJR_std <- sanJR_r[,c(1,3,4)]
+write_csv(sanJR_std, "station_files/stations_std/merged_std/sanJR_e_std.csv")
+
+#VNS, SR3, DAR are in celsius, need to eventually merge these in. 
+
+```
+
+Once the merged standardized files have been created, we can just load these files in.
+This will take a few minutes.
+```{r load std, message = FALSE}
+library(readr)
+
+delta_std <- read_csv("station_files/stations_std/merged_std/delta_e_std.csv")
+sacR_std <- read_csv("station_files/stations_std/merged_std/sacR_e_std.csv")
+sanJR_std <- read_csv("station_files/stations_std/merged_std/sanJR_e_std.csv")
+celsius_std <- read_csv("station_files/stations_std/merged_std/celsius_e_std.csv")
+
+```
+
+Then we can create each individual standardized file. 
+
+```{r std stations, message = FALSE}
+library(dplyr)
+
+#### Create the files in R by filtering from the merged files ####
+
+# Celsius
+DAR_std <- celsius_std %>% filter(station == "DAR")
+ECD_std <- celsius_std %>% filter(station == "ECD")
+MKN_std <- celsius_std %>% filter(station == "MKN")
+SR3_std <- celsius_std %>% filter(station == "SR3")
+SUS_std <- celsius_std %>% filter(station == "SUS")
+SWE_std <- celsius_std %>% filter(station == "SWE")
+VNS_std <- celsius_std %>% filter(station == "VNS")
+SJR_C_std <- celsius_std %>% filter(station == "SJR")# celsius and fahrenheit
+
+# Delta
+BAC_std <- delta_std %>% filter(station == "BAC")
+BET_std <- delta_std %>% filter(station == "BET")
+BLP_std <- delta_std %>% filter(station == "BLP")
+CSE_std <- delta_std %>% filter(station == "CSE")
+CYG_std <- delta_std %>% filter(station == "CYG")
+FAL_std <- delta_std %>% filter(station == "FAL")
+FLT_std <- delta_std %>% filter(station == "FLT")
+FRK_std <- delta_std %>% filter(station == "FRK")
+GOD_std <- delta_std %>% filter(station == "GOD")
+GYS_std <- delta_std %>% filter(station == "GYS")
+GZB_std <- delta_std %>% filter(station == "GZB")
+GZL_std <- delta_std %>% filter(station == "GZL")
+HON_std <- delta_std %>% filter(station == "HON")
+HUN_std <- delta_std %>% filter(station == "HUN")
+IBS_std <- delta_std %>% filter(station == "IBS")
+MDM_std <- delta_std %>% filter(station == "MDM")
+MHO_std <- delta_std %>% filter(station == "MHO")
+MSL_std <- delta_std %>% filter(station == "MSL")
+OBI_std <- delta_std %>% filter(station == "OBI")
+ODM_std <- delta_std %>% filter(station == "ODM")
+OH4_std <- delta_std %>% filter(station == "OH4")
+OLD_std <- delta_std %>% filter(station == "OLD")
+OSJ_std <- delta_std %>% filter(station == "OSJ")
+PCO_std <- delta_std %>% filter(station == "PCO")
+PPT_std <- delta_std %>% filter(station == "PPT")
+ROR_std <- delta_std %>% filter(station == "ROR")
+RSL_std <- delta_std %>% filter(station == "RSL")
+RYC_std <- delta_std %>% filter(station == "RYC")
+SNC_std <- delta_std %>% filter(station == "SNC")
+SUR_std <- delta_std %>% filter(station == "SUR")
+TEA_std <- delta_std %>% filter(station == "TEA")
+VCU_std <- delta_std %>% filter(station == "VCU")
+VOL_std <- delta_std %>% filter(station == "VOL")
+MRZ_std <- delta_std %>% filter(station == "MRZ")# East Bay
+MOK_std <- delta_std %>% filter(station == "MOK")# Mokelumne
+NMR_std <- delta_std %>% filter(station == "NMR")# Mokelumne
+SMR_std <- delta_std %>% filter(station == "SMR")# Mokelumne
+
+# Sacramento River
+BDL_std <- sacR_std %>% filter(station == "BDL")
+BLL_std <- sacR_std %>% filter(station == "BLL")
+DLC_std <- sacR_std %>% filter(station == "DLC")
+DWS_std <- sacR_std %>% filter(station == "DWS")
+FPT_std <- sacR_std %>% filter(station == "FPT")
+GES_std <- sacR_std %>% filter(station == "GES")
+GLN_std <- sacR_std %>% filter(station == "GLN")
+GSS_std <- sacR_std %>% filter(station == "GSS")
+HWB_std <- sacR_std %>% filter(station == "HWB")
+LIB_std <- sacR_std %>% filter(station == "LIB")
+LIS_std <- sacR_std %>% filter(station == "LIS")
+MAL_std <- sacR_std %>% filter(station == "MAL")
+MIR_std <- sacR_std %>% filter(station == "MIR")
+NSL_std <- sacR_std %>% filter(station == "NSL")
+RVB_std <- sacR_std %>% filter(station == "RVB")
+RYI_std <- sacR_std %>% filter(station == "RYI")
+SDI_std <- sacR_std %>% filter(station == "SDI")
+SOI_std <- sacR_std %>% filter(station == "SOI")
+SRH_std <- sacR_std %>% filter(station == "SRH")
+SRV_std <- sacR_std %>% filter(station == "SRV")
+SSI_std <- sacR_std %>% filter(station == "SSI")
+SSS_std <- sacR_std %>% filter(station == "SSS")
+SUT_std <- sacR_std %>% filter(station == "SUT")
+SXS_std <- sacR_std %>% filter(station == "SXS")
+TMS_std <- sacR_std %>% filter(station == "TMS")
+TSL_std <- sacR_std %>% filter(station == "TSL")
+
+# San Joaquin River 
+ANH_std <- sanJR_std %>% filter(station == "ANH")
+BDT_std <- sanJR_std %>% filter(station == "BDT")
+BIR_std <- sanJR_std %>% filter(station == "BIR")
+DGL_std <- sanJR_std %>% filter(station == "DGL")
+DSJ_std <- sanJR_std %>% filter(station == "DSJ")
+FCT_std <- sanJR_std %>% filter(station == "FCT")
+GCT_std <- sanJR_std %>% filter(station == "GCT")
+GLC_std <- sanJR_std %>% filter(station == "GLC")
+GLE_std <- sanJR_std %>% filter(station == "GLE")
+HLT_std <- sanJR_std %>% filter(station == "HLT")
+HOL_std <- sanJR_std %>% filter(station == "HOL")
+LPS_std <- sanJR_std %>% filter(station == "LPS")
+MAB_std <- sanJR_std %>% filter(station == "MAB")
+MHR_std <- sanJR_std %>% filter(station == "MHR")
+MRU_std <- sanJR_std %>% filter(station == "MRU")
+MRX_std <- sanJR_std %>% filter(station == "MRX")
+MSD_std <- sanJR_std %>% filter(station == "MTB")
+MTB_std <- sanJR_std %>% filter(station == "MTB")
+MUP_std <- sanJR_std %>% filter(station == "MUP")
+OAD_std <- sanJR_std %>% filter(station == "OAD")
+OBD_std <- sanJR_std %>% filter(station == "OBD")
+OH1_std <- sanJR_std %>% filter(station == "OH1")
+ORI_std <- sanJR_std %>% filter(station == "ORI")
+ORM_std <- sanJR_std %>% filter(station == "ORM")
+ORQ_std <- sanJR_std %>% filter(station == "ORQ")
+ORX_std <- sanJR_std %>% filter(station == "ORX")
+PDC_std <- sanJR_std %>% filter(station == "PDC")
+PRI_std <- sanJR_std %>% filter(station == "PRI")
+RRI_std <- sanJR_std %>% filter(station == "RRI")
+SGA_std <- sanJR_std %>% filter(station == "SGA")
+SJC_std <- sanJR_std %>% filter(station == "SJC")
+SJD_std <- sanJR_std %>% filter(station == "SJD")
+SJG_std <- sanJR_std %>% filter(station == "SJG")
+SJJ_std <- sanJR_std %>% filter(station == "SJJ")
+SJL_std <- sanJR_std %>% filter(station == "SJL")
+SJR_F_std <- sanJR_std %>% filter(station == "SJR")
+TPI_std <- sanJR_std %>% filter(station == "TPI")
+TPS_std <- sanJR_std %>% filter(station == "TPS")
+TRN_std <- sanJR_std %>% filter(station == "TRN")
+TWA_std <- sanJR_std %>% filter(station == "TWA")
+TWI_std <- sanJR_std %>% filter(station == "TWI")
+WCI_std <- sanJR_std %>% filter(station == "WCI")
+RIP_std <- sanJR_std %>% filter(station == "RIP") # Stanislaus River
+
+SJR_std <- rbind(SJR_F_std, SJR_C_std) # merge F and C files into one for SJR
+
+#### Write files ####
+# Celsius
+write_csv(DAR_std, "station_files/stations_std/DAR_std.csv")
+write_csv(ECD_std, "station_files/stations_std/ECD_std.csv")
+write_csv(MKN_std, "station_files/stations_std/MKN_std.csv")
+write_csv(SR3_std, "station_files/stations_std/SR3_std.csv")
+write_csv(SUS_std, "station_files/stations_std/SUS_std.csv")
+write_csv(SWE_std, "station_files/stations_std/SWE_std.csv")
+write_csv(VNS_std, "station_files/stations_std/VNS_std.csv")
+
+# if you just want to rewrite one station: 
+# write_csv(BDL_std, "station_files/stations_std/BDL_std.csv")
+
+# Celsius
+celsius_std$station <- as.factor(celsius_std$station) # need to factorize the "stations"
+celsius_std1 <- celsius_std %>%
+  filter(station!="SJR")
+for (name in levels(celsius_std1$station)) {
+  #Subset the data station
+  tmp=subset(celsius_std1,station==name)
+  #Create a new filename for each station. Designate the folder you want the files in.
+  fn=paste('station_files/stations_std/',name, "_std.csv", sep="")
+  #Save the CSV file for each station
+  write_csv(tmp,fn)
+}
+
+# Delta
+delta_std$station <- as.factor(delta_std$station) # need to factorize the "stations"
+for (name in levels(delta_std$station)) {
+  #Subset the data station
+  tmp=subset(delta_std,station==name)
+  #Create a new filename for each station. Designate the folder you want the files in.
+  fn=paste('station_files/stations_std/',name, "_std.csv", sep="")
+  #Save the CSV file for each station
+  write_csv(tmp,fn)
+}
+
+# sacR
+sacR_std$station <- as.factor(sacR_std$station) # need to factorize the "stations"
+for (name in levels(sacR_std$station)) {
+  #Subset the data station
+  tmp=subset(sacR_std,station==name)
+  #Create a new filename for each station. Designate the folder you want the files in.
+  fn=paste('station_files/stations_std/',name, "_std.csv", sep="")
+  #Save the CSV file for each station
+  write_csv(tmp,fn)
+}
+
+# sanJR
+sanJR_std$station <- as.factor(sanJR_std$station) # need to factorize the "stations"
+sanJR_std1 <- sanJR_std %>%
+  filter(station!="SJR")
+for (name in levels(sanJR_std1$station)) {
+  #Subset the data station
+  tmp=subset(sanJR_std1,station==name)
+  #Create a new filename for each station. Designate the folder you want the files in.
+  fn=paste('station_files/stations_std/',name, "_std.csv", sep="")
+  #Save the CSV file for each station
+  write_csv(tmp,fn)
+}
+
+# Merge SJR_C and SJR_F before writing. This will overwrite the file created for SJR (above)
+SJR_C_std <- celsius_std %>% filter(station == "SJR")# celsius and fahrenheit
+SJR_F_std <- sanJR_std %>% filter(station == "SJR")
+SJR_std <- rbind(SJR_F_std, SJR_C_std) # merge F and C files into one for SJR
+write_csv(SJR_std, "station_files/stations_std/VNS_std.csv")
+
+```
+Merge celsius stations into other datasets. 
+
+```{r}
+####################
+### Write celsius files to global environment
+celsius_std$station <- as.factor(celsius_std$station) # need to factorize the "stations"
+
+for (name in levels(celsius_std$station)) {
+  temp=subset(celsius_std, station==name)
+  fn=assign(paste0(name,"_std"),temp, envir = globalenv())
+}
+
+DAR_std <- read_csv("station_files/stations_std/DAR_std.csv")
+ECD_std <- read_csv("station_files/stations_std/ECD_std.csv")
+MKN_std <- read_csv("station_files/stations_std/MKN_std.csv")
+SR3_std <- read_csv("station_files/stations_std/SR3_std.csv")
+SUS_std <- read_csv("station_files/stations_std/SUS_std.csv")
+SWE_std <- read_csv("station_files/stations_std/SWE_std.csv")
+VNS_std <- read_csv("station_files/stations_std/VNS_std.csv")
+SJR_std <- read_csv("station_files/stations_std/SJR_std.csv")
+
+# Incorporate celsius files into new standardized datasets
+delta_std_f <- rbind(delta_std, ECD_std, MKN_std)
+delta_std_f$region <- "delta"
+
+sacR_std_f <- rbind(sacR_std, SUS_std, SWE_std)
+sacR_std_f$region <- "sacR"
+
+sanJR_std2 <- sanJR_std%>%
+  filter(station!="SJR") #SJR = SJR_F and SJR_C
+
+sanJR_std_f <- rbind(sanJR_std, SJR_std, VNS_std, SR3_std, DAR_std)
+sanJR_std_f$region <- "sanJR"
+
+# write files 
+write_csv(sanJR_std_f, "station_files/stations_std/merged_std/sanJR_std_f.csv")
+write_csv(sacR_std_f, "station_files/stations_std/merged_std/sacR_std_f.csv")
+write_csv(delta_std_f, "station_files/stations_std/merged_std/delta_std_f.csv")
+```
+
+Next, download hourly data 
+Raw data
+This includes stations that don't meet the requirements. 
+
+```{r}
+#### Hourly Stations ####
+library(lubridate)
+library(dplyr)
+library(readr)
+
+# Delta 
+
+#Antioch (USBR)
+ANC_h_r=CDECcompyrs_H(1999,2018,"ANC",25)
+ANC_h_r$station="ANC"
+write_csv(ANC_h_r, "station_files/stations_raw/hourly/ANC_h_r.csv")
+
+#Barker Slough Pumping Plant
+BKS_F_h_r=CDECcompyrs_H(1989,2009,"BKS",25)
+BKS_F_h_r$station="BKS"
+write_csv(BKS_F_h_r, "station_files/stations_raw/hourly/BKS_F_h_r.csv")
+
+# Cache Slough
+CCS_h_r=CDECcompyrs_H(1999,2015,"CCS",25)
+CCS_h_r$station="CCS"
+write_csv(CCS_h_r, "station_files/stations_raw/hourly/CCS_h_r.csv")
+
+#Collinsville
+CLL_h_r=CDECcompyrs_H(1999,2018,"CLL",25)
+CLL_h_r$station="CLL"
+write_csv(CLL_h_r, "station_files/stations_raw/hourly/CLL_h_r.csv")
+
+# Contra Costa
+CNT_h_r=CDECcompyrs_H(1999,2018,"CNT",25)
+CNT_h_r$station="CNT"
+write_csv(CNT_h_r, "station_files/stations_raw/hourly/CNT_h_r.csv")
+
+#Cordelia Pumping Plant
+CPP_F_h_r=CDECcompyrs_H(1990,2009,"CPP",25)
+CPP_F_h_r$station="CPP"
+write_csv(CPP_F_h_r, "station_files/stations_raw/hourly/CPP_F_h_r.csv")#Contra Costa
+
+#DMC Headworks
+DMC_h_r=CDECcompyrs_H(1999,2018,"DMC",25)
+DMC_h_r$station="DMC"
+write_csv(DMC_h_r, "station_files/stations_raw/hourly/DMC_h_r.csv")
+
+#Emmaton
+EMM_h_r=CDECcompyrs_H(1999,2018,"EMM",25)
+EMM_h_r$station="EMM"
+write_csv(EMM_h_r, "station_files/stations_raw/hourly/EMM_h_r.csv")
+
+#Farrar Park
+FRP_h_r=CDECcompyrs_H(1999,2018,"FRP",25)
+FRP_h_r$station="FRP"
+write_csv(FRP_h_r, "station_files/stations_raw/hourly/FRP_h_r.csv")
+
+#Harvey O Banks Pumping P (KA000331)
+HBP_F_h_r=CDECcompyrs_H(1987,2009,"HBP",25)
+HBP_F_h_r$station="HBP"
+write_csv(HBP_F_h_r, "station_files/stations_raw/hourly/HBP_F_h_r.csv")
+
+#Holland tract
+HLL_h_r=CDECcompyrs_H(1999,2018,"HLL",25)
+HLL_h_r$station="HLL"
+write_csv(HLL_h_r, "station_files/stations_raw/hourly/HLL_h_r.csv")
+
+#Ibis
+IBS_h_r=CDECcompyrs_H(2004, 2018,"IBS",25)
+IBS_h_r$station="IBS"
+write_csv(IBS_h_r, "station_files/stations_raw/hourly/IBS_h_r.csv")
+
+#Jersey Point
+JER_h_r=CDECcompyrs_H(1999,2018,"JER",25)
+JER_h_r$station="JER"
+write_csv(JER_h_r, "station_files/stations_raw/hourly/JER_h_r.csv")
+
+#Clifton Court (KA000000) Test site
+KA0_h_r=CDECcompyrs_H(2009,2018,"KA0",25)
+KA0_h_r$station="KA0"
+write_csv(KA0_h_r, "station_files/stations_raw/hourly/KA0_h_r.csv")
+
+#Port Chicago
+PCT_h_r=CDECcompyrs_H(1999,2018,"PCT",25)
+PCT_h_r$station="PCT"
+write_csv(PCT_h_r, "station_files/stations_raw/hourly/PCT_h_r.csv")
+
+#Pittsburg
+PTS_h_r=CDECcompyrs_H(1999,2018,"PTS",25)
+PTS_h_r$station="PTS"
+write_csv(PTS_h_r, "station_files/stations_raw/hourly/PTS_h_r.csv")
+
+#Rio Vista
+RIV_h_r=CDECcompyrs_H(1999,2018,"RIV",25)
+RIV_h_r$station="RIV"
+write_csv(RIV_h_r, "station_files/stations_raw/hourly/RIV_h_r.csv")
+
+#Roaring River
+ROR_h_r=CDECcompyrs_H(2008,2018,"ROR",25)
+ROR_h_r$station="ROR"
+write_csv(ROR_h_r, "station_files/stations_raw/hourly/ROR_h_r.csv")
+
+#San Andreas Landing
+SAL_h_r=CDECcompyrs_H(1999,2018,"SAL",25)
+SAL_h_r$station="SAL"
+write_csv(SAL_h_r, "station_files/stations_raw/hourly/SAL_h_r.csv")
+
+#Staten Island
+STI_h_r=CDECcompyrs_H(1999,2018,"STI",25)
+STI_h_r$station="STI"
+write_csv(STI_h_r, "station_files/stations_raw/hourly/STI_h_r.csv")
+
+#Union Island
+UNI_h_r=CDECcompyrs_H(1999,2018,"UNI",25)
+UNI_h_r$station="UNI"
+write_csv(UNI_h_r, "station_files/stations_raw/hourly/UNI_h_r.csv")
+
+#Victoria Island
+VIC_h_r=CDECcompyrs_H(1999,2018,"VIC",25)
+VIC_h_r$station="VIC"
+write_csv(VIC_h_r, "station_files/stations_raw/hourly/VIC_h_r.csv")
+
+#Volantis
+VOL_h_r=CDECcompyrs_H(2000,2018,"VOL",25)
+VOL_h_r$station="VOL"
+write_csv(VOL_h_r, "station_files/stations_raw/hourly/VOL_h_r.csv")
+
+#Martinez
+MRZ_h_r=CDECcompyrs_H(1994,2018,"MRZ",25)
+MRZ_h_r$station="MRZ"
+write_csv(MRZ_h_r, "station_files/stations_raw/hourly/MRZ_h_r.csv")
+
+### Non-Delta - hourly ###
+
+#San Joaquin River at Antioch
+ANH_h_r <- CDECcompyrs_H(2008,2018,"ANH",25)
+ANH_h_r$station="ANH"
+write_csv(ANH_h_r, "station_files/stations_raw/hourly/ANH_h_r.csv")
+
+#Beldon Landing 
+BDL_h_r <- CDECcompyrs_H(2008,2018,"BDL",25)
+BDL_h_r$station="BDL"
+write_csv(BDL_h_r, "station_files/stations_raw/hourly/BDL_h_r.csv")
+
+#Blacklock
+BLL_h_r <- CDECcompyrs_H(2005,2018,"BLL",25)
+BLL_h_r$station="BLL"
+write_csv(BLL_h_r, "station_files/stations_raw/hourly/BLL_h_r.csv")
+
+#Beldon Landing
+#Del Valle Check 7 (KB001638)
+DV7_F_h_r=CDECcompyrs_H(1994,2009,"DV7",25)
+DV7_F_h_r$station="DV7"
+write_csv(DV7_F_h_r, "station_files/stations_raw/hourly/DV7_F_h_r.csv")
+
+#Green's Landing
+GLN_h_r <- CDECcompyrs_H(1999,2004,"GLN",25)
+GLN_h_r$station="GLN"
+write_csv(GLN_h_r, "station_files/stations_raw/hourly/GLN_h_r.csv")
+
+#Sacramento River at Mallard Island - sensor 25
+MAL_h_r <- CDECcompyrs_H(1986,2018,"MAL",25)
+MAL_h_r$station="MAL"
+write_csv(MAL_h_r, "station_files/stations_raw/hourly/MAL_h_r.csv")
+
+#San Joaquin River at Mossdale Bridge
+MSD_h_r <- CDECcompyrs_H(2008,2018,"MSD",25)
+MSD_h_r$station="MSD"
+write_csv(MSD_h_r, "station_files/stations_raw/hourly/MSD_h_r.csv")
+
+#Middle River at Tracy Blvd - NO DATA AVAILABLE
+MTB_h_r <- CDECcompyrs_H(2000,2002,"MTB",25)
+MTB_h_r$station="MTB"
+write_csv(MTB_h_r, "station_files/stations_raw/hourly/MTB_h_r.csv")
+
+#National Steel - NOT WORKING
+NSL_h_r <- CDECcompyrs_H(2005,2018,"NSL",25)
+NSL_h_r$station="NSL"
+write_csv(NSL_h_r, "station_files/stations_raw/hourly/NSL_h_r.csv")
+
+#Vernalis (USBR)
+VER_h_r=CDECcompyrs_H(1999,2018,"VER",25)
+VER_h_r$station="VER"
+write_csv(VER_h_r, "station_files/stations_raw/hourly/VER_h_r.csv")
+
+#Ripon
+RPN_h_r=CDECcompyrs_H(1999,2018,"RPN",25)
+RPN_h_r$station="RPN"
+write_csv(RPN_h_r, "station_files/stations_raw/hourly/RPN_h_r.csv")
+
+#Sacramento River at Rio Vista Bridge - NOT WORKING
+RVB_h_r <- CDECcompyrs_H(2007,2018,"RVB",25)
+RVB_h_r$station="RVB"
+write_csv(RVB_h_r, "station_files/stations_raw/hourly/RVB_h_r.csv")
+
+#Stanislaus R before conf of San Joaquin
+SBC_h_r=CDECcompyrs_H(2001,2004,"SBC",25)
+SBC_h_r$station="SBC"
+write_csv(SBC_h_r, "station_files/stations_raw/hourly/SBC_h_r.csv")
+
+#San Joaquin River Below Old R near Lathrop
+SJL_h_r <- CDECcompyrs_H(2004,2006,"SJL",25)
+SJL_h_r$station="SJL"
+write_csv(SJL_h_r, "station_files/stations_raw/hourly/SJL_h_r.csv")
+
+#Sacramento River at Hood
+SRH_h_r <- CDECcompyrs_H(1998,2018,"SRH",25)
+SRH_h_r$station="SRH"
+write_csv(SRH_h_r, "station_files/stations_raw/hourly/SRH_h_r.csv")
+
+##### Celsius Stations - hourly ####
+
+#Barker Slough Pumping Plant (Celsius)
+BKS_C_h_r=CDECcompyrs_H(2009, 2018,"BKS",146)
+BKS_C_h_r$station="BKS"
+write_csv(BKS_C_h_r, "station_files/stations_raw/hourly/BKS_C_h_r.csv")
+
+#Clifton Court
+CLC_h_r=CDECcompyrs_H(2009,2018,"CLC",146)
+CLC_h_r$station="CLC"
+write_csv(CLC_h_r, "station_files/stations_raw/hourly/CLC_h_r.csv")
+
+#Cordelia Pumping Plant
+CPP_C_h_r=CDECcompyrs_H(1009,2018,"CPP",146)
+CPP_C_h_r$station="CPP"
+write_csv(CPP_C_h_r, "station_files/stations_raw/hourly/CPP_C_h_r.csv")
+
+#Del Valle Check 7 
+DV7_C_h_r=CDECcompyrs_H(2009, 2018,"DV7",146)
+DV7_C_h_r$station="DV7"
+write_csv(DV7_C_h_r, "station_files/stations_raw/hourly/DV7_C_h_r.csv")
+
+#Dyer Reservoir
+DYR_h_r <- CDECcompyrs_H(2014,2018,"DYR",146)
+DYR_h_r$station="DYR"
+write_csv(DYR_h_r, "station_files/stations_raw/hourly/DYR_h_r.csv")
+
+#Harvey O Banks Pumping P (KA000331)
+HBP_C_h_r=CDECcompyrs_H(2008, 2018,"HBP",146)
+HBP_C_h_r$station="HBP"
+write_csv(HBP_C_h_r, "station_files/stations_raw/hourly/HBP_C_h_r.csv")
+
+```
+
+
+1. Merge all hourly fahrenheit files together. 
+2. Merge all hourly celsius files together. 
+3. Merge these together into one big hourly file. 
+4. Write file.
+
+```{r message = FALSE}
+library(readr)
+
+ANC_h_r <- read_csv("station_files/stations_raw/hourly/ANC_h_r.csv")
+ANH_h_r <- read_csv("station_files/stations_raw/hourly/ANH_h_r.csv")
+BDL_h_r <- read_csv("station_files/stations_raw/hourly/BDL_h_r.csv")
+BKS_F_h_r <- read_csv("station_files/stations_raw/hourly/BKS_F_h_r.csv")
+BLL_h_r <- read_csv("station_files/stations_raw/hourly/BLL_h_r.csv")
+CCS_h_r <- read_csv("station_files/stations_raw/hourly/CCS_h_r.csv")
+CLL_h_r <- read_csv("station_files/stations_raw/hourly/CLL_h_r.csv")
+CNT_h_r <- read_csv("station_files/stations_raw/hourly/CNT_h_r.csv")
+DMC_h_r <- read_csv("station_files/stations_raw/hourly/DMC_h_r.csv")
+CPP_F_h_r <- read_csv("station_files/stations_raw/hourly/CPP_F_h_r.csv")
+DV7_F_h_r <- read_csv("station_files/stations_raw/hourly/DV7_F_h_r.csv")
+EMM_h_r <- read_csv("station_files/stations_raw/hourly/EMM_h_r.csv")
+FRP_h_r <- read_csv("station_files/stations_raw/hourly/FRP_h_r.csv")
+GLN_h_r <- read_csv("station_files/stations_raw/hourly/GLN_h_r.csv")
+HBP_F_h_r<- read_csv("station_files/stations_raw/hourly/HBP_F_h_r.csv") # will need to change
+HLL_h_r <- read_csv("station_files/stations_raw/hourly/HLL_h_r.csv")
+IBS_h_r <- read_csv("station_files/stations_raw/hourly/IBS_h_r.csv") 
+JER_h_r <- read_csv("station_files/stations_raw/hourly/JER_h_r.csv")
+KA0_h_r <- read_csv("station_files/stations_raw/hourly/KA0_h_r.csv")
+MAL_h_r <- read_csv("station_files/stations_raw/hourly/MAL_h_r.csv")
+MSD_h_r <- read_csv("station_files/stations_raw/hourly/MSD_h_r.csv")
+MTB_h_r <- read_csv("station_files/stations_raw/hourly/MTB_h_r.csv")
+MRZ_h_r <- read_csv("station_files/stations_raw/hourly/MRZ_h_r.csv") 
+NSL_h_r <- read_csv("station_files/stations_raw/hourly/NSL_h_r.csv")
+PCT_h_r <- read_csv("station_files/stations_raw/hourly/PCT_h_r.csv")
+PTS_h_r <- read_csv("station_files/stations_raw/hourly/PTS_h_r.csv")
+RIV_h_r <- read_csv("station_files/stations_raw/hourly/RIV_h_r.csv")
+ROR_h_r <- read_csv("station_files/stations_raw/hourly/ROR_h_r.csv") 
+RPN_h_r <- read_csv("station_files/stations_raw/hourly/RPN_h_r.csv")
+RVB_h_r <- read_csv("station_files/stations_raw/hourly/RVB_h_r.csv")
+SAL_h_r <- read_csv("station_files/stations_raw/hourly/SAL_h_r.csv")
+SBC_h_r <- read_csv("station_files/stations_raw/hourly/SBC_h_r.csv")
+SJL_h_r <- read_csv("station_files/stations_raw/hourly/SJL_h_r.csv")
+SRH_h_r <- read_csv("station_files/stations_raw/hourly/SRH_h_r.csv")
+STI_h_r <- read_csv("station_files/stations_raw/hourly/STI_h_r.csv")
+UNI_h_r <- read_csv("station_files/stations_raw/hourly/UNI_h_r.csv")
+VER_h_r <- read_csv("station_files/stations_raw/hourly/VER_h_r.csv")
+VIC_h_r <- read_csv("station_files/stations_raw/hourly/VIC_h_r.csv")
+VOL_h_r <- read_csv("station_files/stations_raw/hourly/VOL_h_r.csv") 
+
+hour_F <- rbind(ANC_h_r, ANH_h_r, BDL_h_r, BKS_F_h_r, BLL_h_r, CCS_h_r, CLL_h_r, CNT_h_r, 
+                CPP_F_h_r, DMC_h_r, DV7_F_h_r, EMM_h_r, FRP_h_r, GLN_h_r, HBP_F_h_r,
+                HLL_h_r, IBS_h_r, JER_h_r, KA0_h_r, MAL_h_r, MSD_h_r, MRZ_h_r, MTB_h_r, 
+                NSL_h_r, PCT_h_r, PTS_h_r, RIV_h_r,ROR_h_r, RPN_h_r, RVB_h_r, SAL_h_r, 
+                SBC_h_r, SJL_h_r, SRH_h_r, STI_h_r, UNI_h_r, VER_h_r, VIC_h_r, VOL_h_r)
+hour_F$s25 <- as.numeric(hour_F$s25)
+hour_F$Temp <- ((hour_F$s25)-32)/1.8
+hour_F_convert <- hour_F[,c(1,3,4)]
+
+# Celsius merge
+BKS_C_h_r <- read_csv("station_files/stations_raw/hourly/BKS_C_h_r.csv") 
+CLC_C_h_r <- read_csv("station_files/stations_raw/hourly/CLC_h_r.csv")
+CPP_C_h_r <- read_csv("station_files/stations_raw/hourly/CPP_C_h_r.csv")
+DV7_C_h_r <- read_csv("station_files/stations_raw/hourly/DV7_C_h_r.csv")
+DYR_C_h_r <- read_csv("station_files/stations_raw/hourly/DYR_h_r.csv")
+HBP_C_h_r <- read_csv("station_files/stations_raw/hourly/HBP_C_h_r.csv") # will need to add
+
+hour_C <- rbind(BKS_C_h_r, CLC_C_h_r, CPP_C_h_r, DV7_C_h_r, DYR_C_h_r, HBP_C_h_r)
+names(hour_C)[2] <- "Temp"
+
+# Combine F and C files into one
+hour_std <- rbind(hour_C, hour_F_convert)
+write_csv(hour_std, "station_files/stations_std/merged_std/hourly_std.csv")
+
+```
+
+Load and write individual standardized files for each hourly station.
+
+```{r message = FALSE}
+library(readr)
+library(dplyr)
+hour_std <- read_csv("station_files/stations_std/merged_std/hourly_std.csv")
+hour_std$station <- as.factor(hour_std$station)
+
+#Get the list of unique MP names
+for (name in levels(hour_std$station)) {
+  #Subset the data station
+  tmp=subset(hour_std,station==name)
+  #Create a new filename for each station. Designate the folder you want the files in.
+  fn=paste('station_files/stations_std/hourly/',name, "_h_std.csv", sep="")
+  #Save the CSV file for each station
+  write_csv(tmp, fn)
+}
+
+# Just in case
+#MRZ_h_std <- hour_std %>% filter(station == "MRZ")
+#write_csv(MRZ_h_std, "station_files/stations_std/hourly/MRZ_h_std.csv")
+
+```
+
+Merge hourly and event data for those where both files are needed.
+
+```{r}
+IBS_std <- read_csv("station_files/stations_std/IBS_std.csv")
+IBS_h_std <- read_csv("station_files/stations_std/hourly/IBS_h_std.csv")
+IBS_m_std <- rbind(IBS_std, IBS_h_std)
+write_csv(IBS_m_std,"station_files/stations_std/IBS_m_std.csv")
+
+MTB_std <- read_csv("station_files/stations_std/MTB_std.csv")
+MTB_h_std <- read_csv("station_files/stations_std/hourly/MTB_h_std.csv")
+MTB_m_std <- rbind(MTB_std, MTB_h_std)
+write_csv(MTB_m_std,"station_files/stations_std/MTB_m_std.csv")
+
+SJL_std <- read_csv("station_files/stations_std/SJL_std.csv")
+SJL_h_std <- read_csv("station_files/stations_std/hourly/SJL_h_std.csv")
+SJL_m_std <- rbind(SJL_std, SJL_h_std)
+write_csv(SJL_m_std,"station_files/stations_std/SJL_m_std.csv")
+
+GLN_std <- read_csv("station_files/stations_std/GLN_std.csv")
+GLN_h_std <- read_csv("station_files/stations_std/hourly/GLN_h_std.csv")
+GLN_m_std <- rbind(GLN_std, GLN_h_std)
+write_csv(GLN_m_std,"station_files/stations_std/GLN_m_std.csv")
+
+```
+
+read in 
+```{r}
+ANC_h_std <- read_csv("station_files/stations_std/hourly/ANC_h_std.csv")
+ANH_h_std <- read_csv("station_files/stations_std/hourly/ANH_h_std.csv")
+BDL_h_std <- read_csv("station_files/stations_std/hourly/BDL_h_std.csv")
+BKS_h_std <- read_csv("station_files/stations_std/hourly/BKS_h_std.csv")
+BLL_h_std <- read_csv("station_files/stations_std/hourly/BLL_h_std.csv")
+CCS_h_std <- read_csv("station_files/stations_std/hourly/CCS_h_std.csv")
+CLL_h_std <- read_csv("station_files/stations_std/hourly/CLL_h_std.csv")
+CNT_h_std <- read_csv("station_files/stations_std/hourly/CNT_h_std.csv")
+DMC_h_std <- read_csv("station_files/stations_std/hourly/DMC_h_std.csv")
+CPP_h_std <- read_csv("station_files/stations_std/hourly/CPP_h_std.csv")
+DV7_h_std <- read_csv("station_files/stations_std/hourly/DV7_h_std.csv")
+EMM_h_std <- read_csv("station_files/stations_std/hourly/EMM_h_std.csv")
+FRP_h_std <- read_csv("station_files/stations_std/hourly/FRP_h_std.csv")
+GLN_h_std <- read_csv("station_files/stations_std/hourly/GLN_h_std.csv")
+HBP_h_std <- read_csv("station_files/stations_std/hourly/HBP_h_std.csv") # will need to change
+HLL_h_std <- read_csv("station_files/stations_std/hourly/HLL_h_std.csv")
+IBS_h_std <- read_csv("station_files/stations_std/hourly/IBS_h_std.csv") 
+JER_h_std <- read_csv("station_files/stations_std/hourly/JER_h_std.csv")
+KA0_h_std <- read_csv("station_files/stations_std/hourly/KA0_h_std.csv")
+MAL_h_std <- read_csv("station_files/stations_std/hourly/MAL_h_std.csv")
+MSD_h_std <- read_csv("station_files/stations_std/hourly/MSD_h_std.csv")
+MTB_h_std <- read_csv("station_files/stations_std/hourly/MTB_h_std.csv")
+MRZ_h_std <- read_csv("station_files/stations_std/hourly/MRZ_h_std.csv") 
+NSL_h_std <- read_csv("station_files/stations_std/hourly/NSL_h_std.csv")
+PCT_h_std <- read_csv("station_files/stations_std/hourly/PCT_h_std.csv")
+PTS_h_std <- read_csv("station_files/stations_std/hourly/PTS_h_std.csv")
+RIV_h_std <- read_csv("station_files/stations_std/hourly/RIV_h_std.csv")
+ROR_h_std <- read_csv("station_files/stations_std/hourly/ROR_h_std.csv")
+RPN_h_std <- read_csv("station_files/stations_std/hourly/RPN_h_std.csv")
+RVB_h_std <- read_csv("station_files/stations_std/hourly/RVB_h_std.csv")
+SAL_h_std <- read_csv("station_files/stations_std/hourly/SAL_h_std.csv")
+SBC_h_std <- read_csv("station_files/stations_std/hourly/SBC_h_std.csv")
+SJL_h_std <- read_csv("station_files/stations_std/hourly/SJL_h_std.csv")
+SRH_h_std <- read_csv("station_files/stations_std/hourly/SRH_h_std.csv")
+STI_h_std <- read_csv("station_files/stations_std/hourly/STI_h_std.csv")
+UNI_h_std <- read_csv("station_files/stations_std/hourly/UNI_h_std.csv")
+VER_h_std <- read_csv("station_files/stations_std/hourly/VER_h_std.csv")
+VIC_h_std <- read_csv("station_files/stations_std/hourly/VIC_h_std.csv")
+VOL_h_std <- read_csv("station_files/stations_std/hourly/VOL_h_std.csv") 
+CLC_h_std <- read_csv("station_files/stations_std/hourly/CLC_h_std.csv")
+DYR_h_std <- read_csv("station_files/stations_std/hourly/DYR_h_std.csv")
+
+#SWE_std <- read_csv("station_files/stations_std/SWE_std.csv")
+
+```
+
+
+
+
+Make larger delta, sacR, sanJR and merged files that have one single file per station. 
+Write files.
+
+```{r}
+delta_std_single <- rbind(ANC_h_std, BAC_std, BET_std, BKS_h_std, BLP_std, CCS_h_std, CLC_h_std, CLL_h_std,
+                          CNT_h_std, CPP_h_std, CSE_std, CYG_std, DMC_h_std, DV7_h_std, DYR_h_std,
+                          EMM_h_std, FAL_std, FLT_std, FRK_std, FRP_h_std, GOD_std, GYS_std, 
+                          GZB_std, GZL_std, HBP_h_std, HLL_h_std,HON_std, HUN_std, 
+                          IBS_m_std, JER_h_std, KA0_h_std, MDM_std, MHO_std, 
+                          MSL_std, OBI_std, ODM_std, OH4_std, OLD_std, OSJ_std, PCO_std, 
+                          PCT_h_std, PPT_std, PTS_h_std, RIV_h_std, ROR_h_std, RSL_std, RYC_std, 
+                          SAL_h_std, SNC_std, STI_h_std, SUR_std, TEA_std, UNI_h_std,
+                          VCU_std, VIC_h_std, VOL_h_std, MRZ_h_std, MOK_std, NMR_std, SMR_std)
+write_csv(delta_std_single, "station_files/stations_sin/merged/delta_std_sin.csv")
+
+sacR_std_single <- rbind(BDL_h_std, BLL_h_std, DLC_std, DWS_std, FPT_std, GES_std, GLN_m_std, 
+                         GSS_std, HWB_std, LIB_std, LIS_std, MAL_h_std, MIR_std, NSL_h_std, 
+                         RVB_h_std, RYI_std, SDI_std, SOI_std, SRH_h_std, SRV_std, SSI_std, 
+                         SSS_std, SUS_std, SUT_std, SWE_std, SXS_std, TMS_std, TSL_std)
+write_csv(sacR_std_single, "station_files/stations_sin/merged/sacR_std_sin.csv")
+
+sanJR_std_single <- rbind(ANH_h_std, BDT_std, BIR_std, DAR_std, DGL_std, DSJ_std, FCT_std, GCT_std, 
+                          GLC_std, GLE_std,HLT_std, HOL_std, LPS_std, MAB_std, MHR_std, MUP_std, 
+                          MRU_std, MRX_std, MSD_h_std, MTB_m_std, OAD_std, OBD_std, OH1_std, 
+                          ORI_std, ORM_std, ORQ_std, ORX_std, PDC_std, PRI_std, 
+                          RRI_std, SBC_h_std, SGA_std, SJC_std, SJD_std, SJG_std, SJJ_std, SJL_m_std, 
+                          SJR_std, SR3_std, TPI_std, TRN_std, TWA_std, TWI_std, 
+                          VER_h_std, VNS_std, WCI_std,RIP_std, RPN_h_std)
+write_csv(sanJR_std_single, "station_files/stations_sin/merged/sanJR_std_sin.csv")
+
+allsta_std_single <- rbind(delta_std_single, sacR_std_single, sanJR_std_single)
+allsta_std_single$qa <- "none"
+write_csv(allsta_std_single, "station_files/stations_sin/merged/allsta_std_sin.csv")
+
+```
+
+
+Write individual station files. 
+
+```{r}
+library(readr)
+allsta <- allsta_std_single # If continuing from above
+
+# If loading file
+allsta <-  read_csv("station_files/stations_sin/merged/allsta_std_sin.csv")
+allsta$qa <- "none"
+allsta$station <- as.factor(allsta$station) # need to factorize the "stations"
+
+#Get the list of unique MP names
+for (name in levels(allsta$station)) {
+  #Subset the data station
+  tmp=subset(allsta,station==name)
+  #Create a new filename for each station. Designate the folder you want the files in.
+  fn=paste('station_files/stations_sin/',name, "_std_sin.csv", sep="")
+  #Save the CSV file for each station
+  write_csv(tmp,fn)
+}
+```

@@ -1,0 +1,644 @@
+---
+title: "CDEC_QA_comparisons"
+author: "Catarina Pien"
+date: "September 25, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+## Comparison of CDEC Data with Counterparts in Water Data Library and USGS National Water Information System
+
+Compare same sites between CDEC - DWR Water Data Library and CDEC - USGS NWIS
+
+Load Files into appropriate formats
+
+```{r loading, eval = FALSE, include = FALSE, message = FALSE, warning = FALSE}
+rm(list=ls(all=TRUE))
+
+library(readr)
+
+setwd("P:/ClimateChange/R_code")
+# Read files, round all temperatures to one decimal place
+
+FCT_WDL <- read_csv("Comparisons_QA_CDEC/FCT_WDL.csv")
+FCT_std <- read_csv("Comparisons_QA_CDEC/FCT_std.csv")
+FCT_WDL$Temp <- as.numeric(format(round(FCT_WDL$Temp, 1), nsmall=1))
+FCT_std$Temp <- as.numeric(format(round(FCT_std$Temp, 1), nsmall=1))
+
+TMS_WDL <- read_csv("Comparisons_QA_CDEC/TMS_WDL.csv")
+TMS_std <- read_csv("Comparisons_QA_CDEC/TMS_std.csv")
+TMS_WDL$Temp <- as.numeric(format(round(TMS_WDL$Temp, 1), nsmall=1))
+TMS_std$Temp <- as.numeric(format(round(TMS_std$Temp, 1), nsmall=1))
+
+OSJ_WDL <- read_csv("Comparisons_QA_CDEC/OSJ_WDL.csv")
+OSJ_std <- read_csv("Comparisons_QA_CDEC/OSJ_std.csv")
+OSJ_WDL$Temp <- as.numeric(format(round(OSJ_WDL$Temp, 1), nsmall=1))
+OSJ_std$Temp <- as.numeric(format(round(OSJ_std$Temp, 1), nsmall=1))
+
+SOI_WDL <- read_csv("Comparisons_QA_CDEC/SOI_WDL.csv")
+SOI_std <- read_csv("Comparisons_QA_CDEC/SOI_std.csv")
+SOI_WDL$Temp <- as.numeric(format(round(SOI_WDL$Temp, 1), nsmall=1))
+SOI_std$Temp <- as.numeric(format(round(SOI_std$Temp, 1), nsmall=1))
+
+GSS_NWIS <- read_csv("Comparisons_QA_CDEC/GSS_NWIS.csv")
+GSS_std <- read_csv("Comparisons_QA_CDEC/GSS_std.csv")
+GSS_NWIS$Temp <- as.numeric(format(round(GSS_NWIS$Temp, 1), nsmall=1))
+GSS_std$Temp <- as.numeric(format(round(GSS_std$Temp, 1), nsmall=1))
+
+LPS_NWIS <- read_csv("Comparisons_QA_CDEC/LPS_NWIS.csv")
+LPS_std <- read_csv("Comparisons_QA_CDEC/LPS_std.csv")
+LPS_NWIS$Temp <- as.numeric(format(round(LPS_NWIS$Temp, 1), nsmall=1))
+LPS_std$Temp <- as.numeric(format(round(LPS_std$Temp, 1), nsmall=1))
+
+PRI_NWIS <- read_csv("Comparisons_QA_CDEC/PRI_NWIS.csv")
+PRI_std <- read_csv("Comparisons_QA_CDEC/PRI_std.csv")
+PRI_NWIS$Temp <- as.numeric(format(round(PRI_NWIS$Temp, 1), nsmall=1))
+PRI_std$Temp <- as.numeric(format(round(PRI_std$Temp, 1), nsmall=1))
+
+SJJ_NWIS <- read_csv("Comparisons_QA_CDEC/SJJ_NWIS.csv")
+SJJ_std <- read_csv("Comparisons_QA_CDEC/SJJ_std.csv")
+SJJ_NWIS$Temp <- as.numeric(format(round(SJJ_NWIS$Temp, 1), nsmall=1))
+SJJ_std$Temp <- as.numeric(format(round(SJJ_std$Temp, 1), nsmall=1))
+
+# Standardize time formats
+FCT_WDL$datetime <- as.POSIXct(FCT_WDL$datetime, format = "%m/%d/%Y %H:%M")
+FCT_WDL$datetime <- as.POSIXct(FCT_WDL$datetime, format = "%Y-%M-%D %H:%M:%S")
+TMS_WDL$datetime <- as.POSIXct(TMS_WDL$datetime, format = "%m/%d/%Y %H:%M")
+TMS_WDL$datetime <- as.POSIXct(TMS_WDL$datetime, format = "%Y-%M-%D %H:%M:%S")
+OSJ_WDL$datetime <- as.POSIXct(OSJ_WDL$datetime, format = "%m/%d/%Y %H:%M")
+OSJ_WDL$datetime <- as.POSIXct(OSJ_WDL$datetime, format = "%Y-%M-%D %H:%M:%S")
+SOI_WDL$datetime <- as.POSIXct(SOI_WDL$datetime, format = "%m/%d/%Y %H:%M")
+SOI_WDL$datetime <- as.POSIXct(SOI_WDL$datetime, format = "%Y-%M-%D %H:%M:%S")
+GSS_NWIS$datetime <- as.POSIXct(GSS_NWIS$datetime, format = "%m/%d/%y %H:%M")
+GSS_NWIS$datetime <- as.POSIXct(GSS_NWIS$datetime, format = "%Y-%M-%D %H:%M:%S")
+LPS_NWIS$datetime <- as.POSIXct(LPS_NWIS$datetime, format = "%m/%d/%y %H:%M")
+LPS_NWIS$datetime <- as.POSIXct(LPS_NWIS$datetime, format = "%Y-%M-%D %H:%M:%S")
+PRI_NWIS$datetime <- as.POSIXct(PRI_NWIS$datetime, format = "%m/%d/%y %H:%M")
+PRI_NWIS$datetime <- as.POSIXct(PRI_NWIS$datetime, format = "%Y-%M-%D %H:%M:%S")
+SJJ_NWIS$datetime <- as.POSIXct(SJJ_NWIS$datetime, format = "%m/%d/%y %H:%M")
+SJJ_NWIS$datetime <- as.POSIXct(SJJ_NWIS$datetime, format = "%Y-%M-%D %H:%M:%S")
+
+write_csv(FCT_WDL, "Comparisons_QA_CDEC/formatted/FCT_WDL_2.csv")
+write_csv(FCT_std, "Comparisons_QA_CDEC/formatted/FCT_std_2.csv")
+write_csv(TMS_WDL, "Comparisons_QA_CDEC/formatted/TMS_WDL_2.csv")
+write_csv(TMS_std, "Comparisons_QA_CDEC/formatted/TMS_std_2.csv")
+write_csv(OSJ_WDL, "Comparisons_QA_CDEC/formatted/OSJ_WDL_2.csv")
+write_csv(OSJ_std, "Comparisons_QA_CDEC/formatted/OSJ_std_2.csv")
+write_csv(SOI_WDL, "Comparisons_QA_CDEC/formatted/SOI_WDL_2.csv")
+write_csv(SOI_std, "Comparisons_QA_CDEC/formatted/SOI_std_2.csv")
+write_csv(GSS_NWIS, "Comparisons_QA_CDEC/formatted/GSS_NWIS_2.csv")
+write_csv(GSS_std, "Comparisons_QA_CDEC/formatted/GSS_std_2.csv")
+write_csv(LPS_NWIS, "Comparisons_QA_CDEC/formatted/LPS_NWIS_2.csv")
+write_csv(LPS_std, "Comparisons_QA_CDEC/formatted/LPS_std_2.csv")
+write_csv(PRI_NWIS, "Comparisons_QA_CDEC/formatted/PRI_NWIS_2.csv")
+write_csv(PRI_std, "Comparisons_QA_CDEC/formatted/PRI_std_2.csv")
+write_csv(SJJ_NWIS, "Comparisons_QA_CDEC/formatted/SJJ_NWIS_2.csv")
+write_csv(SJJ_std, "Comparisons_QA_CDEC/formatted/SJJ_std_2.csv")
+```
+
+
+After files saved in correct formats, read files in.
+
+```{r read, warning = FALSE, message = FALSE, results = FALSE}
+library(readr)
+setwd("P:/ClimateChange/R_code")
+
+FCT_WDL <- read_csv("Comparisons_QA_CDEC/formatted/FCT_WDL_2.csv")
+FCT_std <- read_csv("Comparisons_QA_CDEC/formatted/FCT_std_2.csv")
+TMS_WDL <- read_csv("Comparisons_QA_CDEC/formatted/TMS_WDL_2.csv")
+TMS_std <- read_csv("Comparisons_QA_CDEC/formatted/TMS_std_2.csv")
+OSJ_WDL <- read_csv("Comparisons_QA_CDEC/formatted/OSJ_WDL_2.csv")
+OSJ_std <- read_csv("Comparisons_QA_CDEC/formatted/OSJ_std_2.csv")
+SOI_WDL <- read_csv("Comparisons_QA_CDEC/formatted/SOI_WDL_2.csv")
+SOI_std <- read_csv("Comparisons_QA_CDEC/formatted/SOI_std_2.csv")
+GSS_NWIS <- read_csv("Comparisons_QA_CDEC/formatted/GSS_NWIS_2.csv")
+GSS_std <- read_csv("Comparisons_QA_CDEC/formatted/GSS_std_2.csv")
+LPS_NWIS <- read_csv("Comparisons_QA_CDEC/formatted/LPS_NWIS_2.csv")
+LPS_std <- read_csv("Comparisons_QA_CDEC/formatted/LPS_std_2.csv")
+PRI_NWIS <- read_csv("Comparisons_QA_CDEC/formatted/PRI_NWIS_2.csv")
+PRI_std <- read_csv("Comparisons_QA_CDEC/formatted/PRI_std_2.csv")
+SJJ_NWIS <- read_csv("Comparisons_QA_CDEC/formatted/SJJ_NWIS_2.csv")
+SJJ_std <- read_csv("Comparisons_QA_CDEC/formatted/SJJ_std_2.csv")
+
+# Standardize time formats
+FCT_WDL$datetime <- as.POSIXct(FCT_WDL$datetime, format = "%Y-%M-%D %H:%M:%S")
+TMS_WDL$datetime <- as.POSIXct(TMS_WDL$datetime, format = "%Y-%M-%D %H:%M:%S")
+OSJ_WDL$datetime <- as.POSIXct(OSJ_WDL$datetime, format = "%Y-%M-%D %H:%M:%S")
+SOI_WDL$datetime <- as.POSIXct(SOI_WDL$datetime, format = "%Y-%M-%D %H:%M:%S")
+GSS_NWIS$datetime <- as.POSIXct(GSS_NWIS$datetime, format = "%Y-%M-%D %H:%M:%S")
+LPS_NWIS$datetime <- as.POSIXct(LPS_NWIS$datetime, format = "%Y-%M-%D %H:%M:%S")
+PRI_NWIS$datetime <- as.POSIXct(PRI_NWIS$datetime, format = "%Y-%M-%D %H:%M:%S")
+SJJ_NWIS$datetime <- as.POSIXct(SJJ_NWIS$datetime, format = "%Y-%M-%D %H:%M:%S")
+```
+
+### Plots (WDL)
+
+Datasets have been downloaded and standardized.
+
+Make some plots to compare datasets.
+
+CDEC datasets were filtered so temperature is restricted from 0 - 30C.
+
+* CDEC = blue
+* Water Data Library = pink
+* **Stations = OSJ, SOI, FCT, TMS**
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+library(ggplot2)
+library(dplyr)
+
+# OSJ
+OSJ_std_QA <- OSJ_std%>%
+  filter(Temp > 0 & Temp < 30)
+
+ggplot() +
+  geom_point(data = OSJ_std_QA, aes(x = datetime, y = Temp), col = "#123CCC", alpha = 0.3)+
+  geom_point(data = OSJ_WDL, aes(x = datetime, y = Temp), col = "#ff6f69", alpha = 0.3)+
+  labs(title = "OSJ") +
+  theme_bw()
+
+# SOI
+SOI_std_QA <- SOI_std%>%
+  filter(Temp > 0 & Temp < 30)
+
+ggplot() +
+  geom_point(data = SOI_std_QA, aes(x = datetime, y = Temp), col = "#123CCC", alpha = 0.3)+
+  geom_point(data = SOI_WDL, aes(x = datetime, y = Temp), col = "#ff6f69", alpha = 0.3)+
+  labs(title = "SOI") +
+  theme_bw()
+
+# FCT
+FCT_std_QA <- FCT_std%>%
+  filter(Temp > 0 & Temp < 30)
+
+ggplot() +
+  geom_point(data = FCT_std_QA, aes(x = datetime, y = Temp), col = "#123CCC", alpha = .3)+
+  geom_point(data = FCT_WDL, aes(x = datetime, y = Temp), col = "#ff6f69", alpha = 0.3)+
+  labs(title = "FCT") +
+  theme_bw()
+
+
+# TMS
+TMS_std_QA <- TMS_std %>%
+  filter(Temp > 0 & Temp < 30)
+
+ggplot() +
+  geom_point(data = TMS_std_QA, aes(x = datetime, y = Temp), col = "#123CCC", alpha = 0.3)+
+  geom_point(data = TMS_WDL, aes(x = datetime, y = Temp), col = "#ff6f69", alpha = 0.3)+
+  labs(title = "TMS") +
+  theme_bw()
+
+
+```
+
+### Plots (NWIS)
+
+* CDEC = blue
+* NWIS = red
+
+**Stations = PRI, SJJ, GSS, LPS**
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+library(ggplot2)
+library(dplyr)
+
+# PRI
+PRI_std_QA <- PRI_std%>%
+  filter(Temp > 0 & Temp < 30)
+
+ggplot() +
+  geom_point(data = PRI_std_QA, aes(x = datetime, y = Temp), col = "#123CCC", alpha = 0.3)+
+  geom_point(data = PRI_NWIS, aes(x = datetime, y = Temp), col = "#CC1231", alpha = 0.3) +
+  labs(title = "PRI") +
+  theme_bw()
+
+# SJJ
+SJJ_std_QA <- SJJ_std%>%
+  filter(Temp > 0 & Temp < 30)
+
+ggplot() +
+  geom_point(data = SJJ_std_QA, aes(x = datetime, y = Temp), col = "#123CCC", alpha = 0.3)+
+  geom_point(data = SJJ_NWIS, aes(x = datetime, y = Temp), col = "#CC1231", alpha = 0.3)+
+  labs(title = "SJJ") +
+  theme_bw()
+
+# GSS
+GSS_std_QA <- GSS_std%>%
+  filter(Temp > 0 & Temp < 30)
+
+ggplot() +
+  geom_point(data = GSS_std_QA, aes(x = datetime, y = Temp), col = "#123CCC", alpha = 0.3)+
+  geom_point(data = GSS_NWIS, aes(x = datetime, y = Temp), col = "#CC1231", alpha = 0.3) +
+  labs(title = "GSS") +
+  theme_bw()
+
+# LPS
+LPS_std_QA <- LPS_std%>%
+  filter(Temp > 0 & Temp < 30)
+
+ggplot() +
+  geom_point(data = LPS_std_QA, aes(x = datetime, y = Temp), col = "#123CCC", alpha = 0.3)+
+  geom_point(data = LPS_NWIS, aes(x = datetime, y = Temp), col = "#CC1231", alpha = 0.3) +
+  labs(title = "LPS") +
+  theme_bw()
+
+
+
+```
+
+
+Try comparing temperature values by datetime - example of code but not results
+
+In comments are the number of differences detected by comparing datasets by datetime. 
+
+```{r compare, eval=FALSE}
+library(testthat)
+library(arsenal)
+
+summary(compare(SOI_std_QA, SOI_WDL, by = "datetime")) # 107000 differences/ 110548 (0.97)
+summary(compare(FCT_std_QA, FCT_WDL, by = "datetime")) # 108174 differences/ 121175 (0.89)
+summary(compare(GSS_std_QA, GSS_NWIS, by = "datetime")) #69556 differences/ 203552 (0.34)
+summary(compare(LPS_std_QA, LPS_NWIS, by = "datetime")) #192766 differences/ 203552 (0.95)
+summary(compare(OSJ_std_QA, OSJ_WDL, by = "datetime")) #132525/ 304586 (0.44)
+summary(compare(PRI_std_QA, PRI_NWIS, by = "datetime")) #156579/ 312562 (0.51)
+summary(compare(TMS_std_QA, TMS_WDL, by = "datetime")) # 198558/ 367035 (0.54)
+summary(compare(SJJ_std_QA, SJJ_NWIS, by = "datetime")) #86020/ 202837 (0.42)
+
+```
+
+
+### Experimental QA - The case of GSS
+
+Add in some variables to sort and visualize the data (date, month)
+```{r,  message = FALSE, warning = FALSE}
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(scales)
+
+# Give GSS different time sorting variables
+GSS_std_QA$date <- as.Date(GSS_std_QA$datetime, format = "%Y-%M-%D")
+GSS_std_QA$month <- month(GSS_std_QA$date)
+GSS_std_QA$yrMon <- format(as.Date(GSS_std_QA$date), "%Y-%m")
+GSS_std_QA$ymon1 <- as.Date(paste(GSS_std_QA$yrMon, "-01", sep=""))
+
+GSS_NWIS$date <- as.Date(GSS_NWIS$datetime, format = "%Y-%M-%D")
+GSS_NWIS$month <- month(GSS_NWIS$date)
+GSS_NWIS$yrMon <- format(as.Date(GSS_NWIS$date), "%Y-%m")
+GSS_NWIS$ymon1 <- as.Date(paste(GSS_NWIS$yrMon, "-01", sep=""))
+
+```
+
+
+#### Outliers
+
+* Calculate outliers based on the "normal" equation (quartile 1-3)
+* Convert outliers to "NA"
+
+```{r, warning = FALSE, message = FALSE}
+
+# Calculate outliers 
+GSS_out <- GSS_std_QA %>%
+  group_by(ymon1) %>%
+  summarize(Q1 = quantile(Temp, probs = 0.25), 
+            Q3 = quantile(Temp, probs = 0.75),
+            IQR = Q3-Q1,
+            ul = Q3 + 1.5 * IQR,
+            ll = Q1 - 1.5 * IQR)
+
+# Merge together ul and ll into the original file with temperatures
+GSS_QA2 <- merge(GSS_std_QA, GSS_out, by = "ymon1")
+
+# Convert values under ll and above ul into "NA"
+GSS_QA2$Temp2 <- ifelse(GSS_QA2$Temp < GSS_QA2$ll | GSS_QA2$Temp> GSS_QA2$ul, "NA", GSS_QA2$Temp)
+GSS_QA2$Temp2 <- as.numeric(GSS_QA2$Temp2)
+
+
+```
+
+
+Same as above, but with less stringent bounds for the outliers (0.1 and 0.9)
+
+```{r , warning = FALSE, message = FALSE}
+## Less stringent
+GSS_out2 <- GSS_std_QA %>%
+  group_by(ymon1) %>%
+  summarize(Q1 = quantile(Temp, probs = 0.1), 
+            Q3 = quantile(Temp, probs = 0.9),
+            IQR = Q3-Q1,
+            ul = Q3 + 1.5 * IQR,
+            ll = Q1 - 1.5 * IQR)
+
+# Merge together ul and ll into the original file with temperatures
+GSS_QA3 <- merge(GSS_std_QA, GSS_out2, by = "ymon1")
+
+# Convert values under ll and above ul into "NA"
+GSS_QA3$Temp2 <- ifelse(GSS_QA3$Temp < GSS_QA2$ll | GSS_QA3$Temp> GSS_QA3$ul, "NA", GSS_QA3$Temp)
+GSS_QA3$Temp2 <- as.numeric(GSS_QA3$Temp2)
+```
+
+
+#### Plots!
+
+##### Date vs Temp
+
+Plots go from least QA to most QA: 
+
+* Original
+* Original QA (limits above 0 and below 30)
+* 0.25-0.75
+* 0.1 - 0.9
+* NWIS QA
+
+```{r echo = FALSE, message = FALSE, warning = FALSE, error = TRUE, fig.height = 5, fig.width=9}
+
+# Original
+ggplot() +
+  geom_point(data = GSS_std, aes(x = datetime, y = Temp))+
+  scale_x_datetime(breaks = date_breaks("4 months"), labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "Original data with no QA") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 13),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+
+# Original QA
+ggplot() +
+  geom_point(data = GSS_std, aes(x = date, y = Temp, col = factor(month)))+
+  scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "Simple QA with lower and upper limits") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 13),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+
+# Medium stringent
+ggplot()+
+  geom_point(data = GSS_QA3, aes(x = date, y = Temp2, col = factor(month)))+
+  scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "QA with some outliers removed") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+
+# Most stringent
+ggplot()+
+  geom_point(data = GSS_QA2, aes(x = date, y = Temp2, col = factor(month)))+
+  scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "QA with more outliers removed - more stringent") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+
+# NWIS
+ggplot()+
+  geom_point(data = GSS_NWIS, aes(x = date, y = Temp, col = factor(month)))+
+  scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "NWIS QA") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+```
+
+Plots go from least QA to most QA: 
+* Original QA (limits above 0 and below 30)
+* 0.25-0.75
+* 0.1 - 0.9
+* NWIS QA
+
+##### Boxplots
+```{r, echo = FALSE, message = FALSE, warning = FALSE, error = TRUE, fig.height = 5, fig.width=9}
+GSS_std_QA1 <- GSS_std_QA[50000:170000,]
+# Original QA
+ggplot() +
+  geom_boxplot(data = GSS_std_QA1, aes(x = ymon1, y = Temp, group = factor(ymon1), 
+                                      col = factor(month)))+
+    scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+    labs(y = "Temperature (degC)",
+       title = "Simple QA with lower and upper limits") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+
+# medium stringent
+ggplot() +
+  geom_boxplot(data = GSS_QA3, aes(x = ymon1, y = Temp2, group = factor(ymon1),
+                                   col = factor(month)))+
+    scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+    labs(y = "Temperature (degC)",
+       title = "QA with less outliers removed - less stringent") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+
+# most stringent
+ggplot() +
+  geom_boxplot(data = GSS_QA2, aes(x = ymon1, y = Temp2, group = factor(ymon1),
+                                   col = factor(month)))+
+   scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "QA with more outliers removed - more stringent") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+
+# NWIS
+ggplot() +
+  geom_boxplot(data = GSS_NWIS, aes(x = ymon1, y = Temp, group = factor(ymon1),
+                                   col = factor(month)))+
+   scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+    labs(y = "Temperature (degC)",
+       title = "NWIS QA") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+
+```
+
+
+##### By month (point plot)
+
+Plots go from least QA to most QA: 
+
+* Original
+* Original QA (limits above 0 and below 30)
+* 0.25-0.75
+* 0.1 - 0.9
+* NWIS QA
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE, fig.height = 5, fig.width=9}
+
+# Original data
+ggplot() +
+  geom_point(data = GSS_std_QA, aes(x = ymon1, y = Temp, col = factor(month)))+
+  scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "Simple QA with lower and upper limits") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+
+# moderate stringent
+ggplot()+
+  geom_point(data = GSS_QA3, aes(x = ymon1, y = Temp2, group = factor(ymon1),
+                                 col = factor(month)))+
+  scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "QA with less outliers removed - less stringent") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+
+# most stringent
+ggplot()+
+  geom_point(data = GSS_QA2, aes(x = ymon1, y = Temp2, col = factor(month)))+
+  scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "QA with more outliers removed - more stringent") +
+  theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+
+# NWIS
+ggplot()+
+  geom_point(data = GSS_NWIS, aes(x = ymon1, y = Temp, col = factor(month)))+
+  scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "NWIS QA") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank(),
+        legend.position = "bottom",
+        plot.title=element_text(hjust = 0.5))
+```
+
+
+
+##### Overlay with NWIS
+
+* Less stringent
+* More stringent
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.height = 5, fig.width=9}
+
+# less stringent
+GSS_QA3$source <- "CDEC_ed"
+GSS_QA3b <- GSS_QA3[,c(2,3,4,5,6,7,1,14,13)]
+GSS_NWIS$source <- "NWIS"
+GSS_NWIS$Temp2 <- GSS_NWIS$Temp
+GSS_all <- rbind(GSS_QA3b, GSS_NWIS)
+
+ggplot(GSS_all, aes(x = date, y = Temp2, col = source), alpha = 0.3) +
+  geom_point()+
+  scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "Less stringent") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank())
+
+
+# most stringent
+GSS_QA2$source <- "CDEC_ed"
+GSS_QA2b <- GSS_QA2[,c(2,3,4,5,6,7,1,14,13)]
+GSS_NWIS$source <- "NWIS"
+GSS_NWIS$Temp2 <- GSS_NWIS$Temp
+GSS_all2 <- rbind(GSS_QA2b, GSS_NWIS)
+
+ggplot(GSS_all2, aes(x = date, y = Temp2, col = source), alpha = 0.3) +
+  geom_point()+
+  scale_x_date(breaks = "4 months", labels = date_format("%b %Y"))+
+  labs(y = "Temperature (degC)",
+       title = "More stringent")+
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, size = 14),
+        axis.title.y = element_text(size = 13),
+        axis.title.x = element_blank())
+
+
+```
+
+
+
+Summarize stats
+
+```{r error = TRUE}
+library(knitr)
+library(kableExtra)
+library(dplyr)
+
+GSS_std_QA$source <- "CDEC_o"
+GSS_std_QA$Temp2 <- GSS_std_QA$Temp
+GSS_all_o <- rbind(GSS_std_QA, GSS_all)
+
+GSS_all_o_st <- GSS_all_o %>%
+  group_by(yrMon, source) %>%
+  summarize(
+    mean = mean(Temp),
+    min = min(Temp),
+    max = max(Temp),
+    number = n())
+
+kable(GSS_all_o_st[1:nrow(GSS_all_o_st),], caption = "less stringent") %>%
+  kable_styling(bootstrap_options = c("hover", full_width = F))
+
+GSS_all_o2 <- rbind(GSS_std_QA, GSS_all2)
+
+GSS_all2st <- GSS_all_o2 %>%
+  group_by(yrMon, source) %>%
+  summarize(
+    mean = mean(Temp),
+    min = min(Temp),
+    max = max(Temp),
+    number = n())
+
+kable(GSS_all2st[1:nrow(GSS_all2st),], caption = "more stringent") %>%
+  kable_styling(bootstrap_options = c("hover", full_width = F))
+
+
+```
+
