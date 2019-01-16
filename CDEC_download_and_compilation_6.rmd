@@ -927,78 +927,12 @@ celsius_std <- read_csv("station_files/stations_std/merged_std/celsius_e_std.csv
 
 ```
 
-Then we can create each individual standardized file. 
-
-```{r std stations, message = FALSE}
-library(dplyr)
-# if you just want to rewrite one/a few stations: 
-#VNS_std <- sanJR_std %>% filter(station =="VNS")
-#write_csv(VNS_std, "station_files/stations_std/VNS_std.csv")
-# Otherwise, use code below.
-
-# Celsius
-celsius_std$station <- as.factor(celsius_std$station) # need to factorize the "stations"
-celsius_std1 <- celsius_std %>%
-  filter(station!="SJR")
-for (name in levels(celsius_std1$station)) {
-  #Subset the data station
-  tmp=subset(celsius_std1,station==name)
-  #Create a new filename for each station. Designate the folder you want the files in.
-  fn=paste('station_files/stations_std/',name, "_std.csv", sep="")
-  #Save the CSV file for each station
-  write_csv(tmp,fn)
-}
-
-# Delta
-delta_std$station <- as.factor(delta_std$station) # need to factorize the "stations"
-for (name in levels(delta_std$station)) {
-  #Subset the data station
-  tmp=subset(delta_std,station==name)
-  #Create a new filename for each station. Designate the folder you want the files in.
-  fn=paste('station_files/stations_std/',name, "_std.csv", sep="")
-  #Save the CSV file for each station
-  write_csv(tmp,fn)
-}
-
-# sacR
-sacR_std$station <- as.factor(sacR_std$station) # need to factorize the "stations"
-for (name in levels(sacR_std$station)) {
-  #Subset the data station
-  tmp=subset(sacR_std,station==name)
-  #Create a new filename for each station. Designate the folder you want the files in.
-  fn=paste('station_files/stations_std/',name, "_std.csv", sep="")
-  #Save the CSV file for each station
-  write_csv(tmp,fn)
-}
-
-# sanJR
-sanJR_std$station <- as.factor(sanJR_std$station) # need to factorize the "stations"
-sanJR_std1 <- sanJR_std %>%
-  filter(station!="SJR")
-for (name in levels(sanJR_std1$station)) {
-  #Subset the data station
-  tmp=subset(sanJR_std1,station==name)
-  #Create a new filename for each station. Designate the folder you want the files in.
-  fn=paste('station_files/stations_std/',name, "_std.csv", sep="")
-  #Save the CSV file for each station
-  write_csv(tmp,fn)
-}
-
-
-# Merge SJR_C and SJR_F before writing. This will overwrite the file created for SJR (above)
-SJR_C_std <- celsius_std %>% filter(station == "SJR")# celsius and fahrenheit
-SJR_F_std <- sanJR_std %>% filter(station == "SJR")
-SJR_std <- rbind(SJR_F_std, SJR_C_std) # merge F and C files into one for SJR
-write_csv(SJR_std, "station_files/stations_std/SJR_std.csv")
-
-```
 Merge celsius stations into other datasets. 
 
 ```{r merge celsius, message = FALSE}
 ####################
 ### Write celsius files to global environment
 celsius_std$station <- as.factor(celsius_std$station) # need to factorize the "stations"
-
 for (name in levels(celsius_std$station)) {
   temp=subset(celsius_std, station==name)
   fn=assign(paste0(name,"_std"),temp, envir = globalenv())
@@ -1011,18 +945,45 @@ delta_std_f$region <- "delta"
 sacR_std_f <- rbind(sacR_std, SUS_std, SWE_std)
 sacR_std_f$region <- "sacR"
 
+SJR_std <- rbind(SJR_F_std, SJR_C_std) # merge F and C files into one for SJR
 sanJR_std2 <- sanJR_std%>%
   filter(station!="SJR") #SJR = SJR_F and SJR_C
-
 sanJR_std_f <- rbind(sanJR_std2, SJR_std, VNS_std, SR3_std, DAR_std)
 sanJR_std_f$region <- "sanJR"
 
-# write files 
+# Combine files
+allsta_std_f <- rbind(delta_std_f, sacR_std_f, sanJR_std_f)
+
+# write large files 
 write_csv(sanJR_std_f, "station_files/stations_std/merged_std/sanJR_std_f.csv")
 write_csv(sacR_std_f, "station_files/stations_std/merged_std/sacR_std_f.csv")
 write_csv(delta_std_f, "station_files/stations_std/merged_std/delta_std_f.csv")
+write_csv(allsta_std_f, "station_files/stations_std/merged_std/allsta_std_f.csv")
+
 ```
 
+Then write individual standardized files. 
+
+```{r std stations, message = FALSE}
+library(dplyr)
+# if you just want to rewrite one/a few stations: 
+#VNS_std <- sanJR_std %>% filter(station =="VNS")
+#write_csv(VNS_std, "station_files/stations_std/VNS_std.csv")
+# Otherwise, use code below.
+
+#allsta_h_std <- read_csv("station_files/stations_std/merged_std/allsta_h_std.csv")
+allsta_std_f$station <- as.factor(allsta_std_f$station)
+
+#Get the list of unique MP names
+for (name in levels(allsta_std_f$station)) {
+  #Subset the data station
+  tmp=subset(allsta_std_f,station==name)
+  #Create a new filename for each station. Designate the folder you want the files in.
+  fn=paste('station_files/stations_std/',name, "_std_f.csv", sep="")
+  #Save the CSV file for each station
+  write_csv(tmp, fn)
+}
+```
 Next, download hourly data - write as raw data
 This includes all stations with data.
 
@@ -1340,13 +1301,14 @@ hour_std <- rbind(hour_C, hour_F_convert)
 
 hour_std$station <- as.factor(hour_std$station) # need to factorize the "stations"
 
+# Write to the global environment
 for (name in levels(hour_std$station)) {
   temp=subset(hour_std, station==name)
   fn=assign(paste0(name,"_h_std"),temp, envir = globalenv())
 }
 
 # Label regions
-delta_h_std <- rbind(BKS_h_std,CLC_h_std, CLL_h_std, EMM_h_std, FRP_h_std, HLL_h_std,
+delta_h_std <- rbind(ANC_h_std, BKS_h_std, CLC_h_std, CLL_h_std, EMM_h_std, FRP_h_std, HLL_h_std,
                      IBS_h_std, JER_h_std, PCT_h_std, PTS_h_std, RIV_h_std, SAL_h_std, STI_h_std,
                      UNI_h_std, VIC_h_std, VOL_h_std, MRZ_h_std,
                      CCS_h_std, CNT_h_std, CPP_h_std, DMC_h_std, DYR_h_std, HBP_h_std, KA0_h_std,
@@ -1369,15 +1331,16 @@ Load and write individual standardized files for each hourly station.
 ```{r message = FALSE}
 library(readr)
 library(dplyr)
-hour_std <- read_csv("station_files/stations_std/merged_std/hourly_std.csv")
-hour_std$station <- as.factor(hour_std$station)
+#allsta_h_std <- read_csv("station_files/stations_std/merged_std/allsta_h_std.csv")
+allsta_h_std$station <- as.factor(hour_std$station)
 
 #Get the list of unique MP names
-for (name in levels(hour_std$station)) {
+for (name in levels(allsta_h_std$station)) {
   #Subset the data station
-  tmp=subset(hour_std,station==name)
+  tmp=subset(allsta_h_std,station==name)
   #Create a new filename for each station. Designate the folder you want the files in.
   fn=paste('station_files/stations_std/hourly/',name, "_h_std.csv", sep="")
+
   #Save the CSV file for each station
   write_csv(tmp, fn)
 }
@@ -1391,30 +1354,42 @@ for (name in levels(hour_std$station)) {
 Merge hourly and event data for those where both files are needed.
 
 ```{r}
-IBS_std <- read_csv("station_files/stations_std/IBS_std.csv")
-IBS_h_std <- read_csv("station_files/stations_std/hourly/IBS_h_std.csv")
-IBS_m_std <- rbind(IBS_std, IBS_h_std)
+# Write files to global environment to be merged
+
+# event
+for (name in levels(allsta_std_f$station)) {
+  temp=subset(allsta_std_f, station==name)
+  fn=assign(paste0(name,"_std_f"),temp, envir = globalenv())
+}
+
+# hourly
+for (name in levels(allsta_h_std$station)) {
+  temp=subset(allsta_h_std, station==name)
+  fn=assign(paste0(name,"_h_std"),temp, envir = globalenv())
+}
+
+# Merge
+IBS_m_std <- rbind(IBS_std_f, IBS_h_std)
 write_csv(IBS_m_std,"station_files/stations_std/IBS_m_std.csv")
 
-MTB_std <- read_csv("station_files/stations_std/MTB_std.csv")
-MTB_h_std <- read_csv("station_files/stations_std/hourly/MTB_h_std.csv")
-MTB_m_std <- rbind(MTB_std, MTB_h_std)
+
+MTB_m_std <- rbind(MTB_std_f, MTB_h_std)
 write_csv(MTB_m_std,"station_files/stations_std/MTB_m_std.csv")
 
-SJL_std <- read_csv("station_files/stations_std/SJL_std.csv")
-SJL_h_std <- read_csv("station_files/stations_std/hourly/SJL_h_std.csv")
-SJL_m_std <- rbind(SJL_std, SJL_h_std)
+
+SJL_m_std <- rbind(SJL_std_f, SJL_h_std)
 write_csv(SJL_m_std,"station_files/stations_std/SJL_m_std.csv")
 
-GLN_std <- read_csv("station_files/stations_std/GLN_std.csv")
-GLN_h_std <- read_csv("station_files/stations_std/hourly/GLN_h_std.csv")
-GLN_m_std <- rbind(GLN_std, GLN_h_std)
+
+GLN_m_std <- rbind(GLN_std_f, GLN_h_std)
 write_csv(GLN_m_std,"station_files/stations_std/GLN_m_std.csv")
 
 ```
 
 read in 
 ```{r}
+
+
 ANC_h_std <- read_csv("station_files/stations_std/hourly/ANC_h_std.csv")
 ANH_h_std <- read_csv("station_files/stations_std/hourly/ANH_h_std.csv")
 BDL_h_std <- read_csv("station_files/stations_std/hourly/BDL_h_std.csv")
@@ -1468,30 +1443,30 @@ Make larger delta, sacR, sanJR and merged files that have one single file per st
 Write files.
 
 ```{r}
-delta_std_single <- rbind(ANC_h_std, BAC_std, BET_std, BKS_h_std, BLP_std, CCS_h_std, CLC_h_std, CLL_h_std,
-                          CNT_h_std, CPP_h_std, CSE_std, CYG_std, DMC_h_std, DV7_h_std, DYR_h_std,
-                          EMM_h_std, FAL_std, FLT_std, FRK_std, FRP_h_std, GOD_std, GYS_std, 
-                          GZB_std, GZL_std, HBP_h_std, HLL_h_std,HON_std, HUN_std, 
-                          IBS_m_std, JER_h_std, KA0_h_std, MDM_std, MHO_std, 
-                          MSL_std, OBI_std, ODM_std, OH4_std, OLD_std, OSJ_std, PCO_std, 
-                          PCT_h_std, PPT_std, PTS_h_std, RIV_h_std, ROR_h_std, RSL_std, RYC_std, 
-                          SAL_h_std, SNC_std, STI_h_std, SUR_std, TEA_std, UNI_h_std,
-                          VCU_std, VIC_h_std, VOL_h_std, MRZ_h_std, MOK_std, NMR_std, SMR_std)
+delta_std_single <- rbind(ANC_h_std, BAC_std_f, BET_std_f, BKS_h_std, BLP_std_f, CCS_h_std, CLC_h_std, CLL_h_std,
+                          CNT_h_std, CPP_h_std, CSE_std_f, CYG_std_f, DMC_h_std, DV7_h_std, DYR_h_std,
+                          EMM_h_std, FAL_std_f, FLT_std_f, FRK_std_f, FRP_h_std, GOD_std_f, GYS_std_f, 
+                          GZB_std_f, GZL_std_f, HBP_h_std, HLL_h_std,HON_std_f, HUN_std_f, 
+                          IBS_m_std, JER_h_std, KA0_h_std, MDM_std_f, MHO_std_f, 
+                          MSL_std_f, OBI_std_f, ODM_std_f, OH4_std_f, OLD_std_f, OSJ_std_f, PCO_std_f, 
+                          PCT_h_std, PPT_std_f, PTS_h_std, RIV_h_std, ROR_h_std, RSL_std_f, RYC_std_f, 
+                          SAL_h_std, SNC_std_f, STI_h_std, SUR_std_f, TEA_std_f, UNI_h_std,
+                          VCU_std_f, VIC_h_std, VOL_h_std, MRZ_h_std, MOK_std_f, NMR_std_f, SMR_std_f)
 write_csv(delta_std_single, "station_files/stations_sin/merged/delta_std_sin.csv")
 
-sacR_std_single <- rbind(BDL_h_std, BLL_h_std, DLC_std, DWS_std, FPT_std, GES_std, GLN_m_std, 
-                         GSS_std, HWB_std, LIB_std, LIS_std, MAL_h_std, MIR_std, NSL_h_std, 
-                         RVB_h_std, RYI_std, SDI_std, SOI_std, SRH_h_std, SRV_std, SSI_std, 
-                         SSS_std, SUS_std, SUT_std, SWE_std, SXS_std, TMS_std, TSL_std)
+sacR_std_single <- rbind(BDL_h_std, BLL_h_std, DLC_std_f, DWS_std_f, FPT_std_f, GES_std_f, GLN_m_std, 
+                         GSS_std_f, HWB_std_f, LIB_std_f, LIS_std_f, MAL_h_std, MIR_std_f, NSL_h_std, 
+                         RVB_h_std, RYI_std_f, SDI_std_f, SOI_std_f, SRH_h_std, SRV_std_f, SSI_std_f, 
+                         SSS_std_f, SUS_std_f, SUT_std_f, SWE_std_f, SXS_std_f, TMS_std_f, TSL_std_f)
 write_csv(sacR_std_single, "station_files/stations_sin/merged/sacR_std_sin.csv")
 
-sanJR_std_single <- rbind(ANH_h_std, BDT_std, BIR_std, DAR_std, DGL_std, DSJ_std, FCT_std, GCT_std, 
-                          GLC_std, GLE_std,HLT_std, HOL_std, LPS_std, MAB_std, MHR_std, MUP_std, 
-                          MRU_std, MRX_std, MSD_h_std, MTB_m_std, OAD_std, OBD_std, OH1_std, 
-                          ORI_std, ORM_std, ORQ_std, ORX_std, PDC_std, PRI_std, 
-                          RRI_std, SBC_h_std, SGA_std, SJC_std, SJD_std, SJG_std, SJJ_std, SJL_m_std, 
-                          SJR_std, SR3_std, TPI_std, TRN_std, TWA_std, TWI_std, 
-                          VER_h_std, VNS_std, WCI_std,RIP_std, RPN_h_std)
+sanJR_std_single <- rbind(ANH_h_std, BDT_std_f, BIR_std_f, DAR_std_f, DGL_std_f, DSJ_std_f, FCT_std_f, GCT_std_f, 
+                          GLC_std_f, GLE_std_f,HLT_std_f, HOL_std_f, LPS_std_f, MAB_std_f, MHR_std_f, MUP_std_f, 
+                          MRU_std_f, MRX_std_f, MSD_h_std, MTB_m_std, OAD_std_f, OBD_std_f, OH1_std_f, 
+                          ORI_std_f, ORM_std_f, ORQ_std_f, ORX_std_f, PDC_std_f, PRI_std_f, 
+                          RRI_std_f, SBC_h_std, SGA_std_f, SJC_std_f, SJD_std_f, SJG_std_f, SJJ_std_f, SJL_m_std, 
+                          SJR_std_f, SR3_std_f, TPI_std_f, TRN_std_f, TWA_std_f, TWI_std_f, 
+                          VER_h_std, VNS_std_f, WCI_std_f,RIP_std_f, RPN_h_std)
 write_csv(sanJR_std_single, "station_files/stations_sin/merged/sanJR_std_sin.csv")
 
 allsta_std_single <- rbind(delta_std_single, sacR_std_single, sanJR_std_single)
@@ -1506,7 +1481,6 @@ Write individual station files.
 ```{r}
 library(readr)
 allsta <- allsta_std_single # If continuing from above
-
 # If loading file
 allsta <-  read_csv("station_files/stations_sin/merged/allsta_std_sin.csv")
 allsta$qa <- "none"
