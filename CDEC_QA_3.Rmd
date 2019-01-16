@@ -32,15 +32,14 @@ sanJR_std_0 <- read_csv("station_files/stations_sin/merged/sanJR_std_sin.csv")
 # checking station
 check <- delta_std_0 %>% filter(station == "DAR")
 
-# Filter out stations we are not using (not contiguous, etc.) 
+# Filter out stations that are not contiguous.
 delta_std <- delta_std_0 %>% 
-  filter(!station %in% c("CCS","FLT","CNT", "CPP", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY", "ANC"))
+  filter(!station %in% c("CNT", "CPP", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY"))
 
-sacR_std <- sacR_std_0 %>%
-  filter(station != "GLN")
+sacR_std <- sacR_std_0
 
 sanJR_std <- sanJR_std_0 %>%
-  filter(!station %in% c("GCT", "MHR", "MUP", "OAD", "OBD", "SBC", "DAR", "TPS"))
+  filter(!station %in% c("DAR", "TPS"))
 
 # Add some columns to sort by date
 delta_std$date <- as.Date(delta_std$datetime, format = "%Y-%m-%d")
@@ -197,8 +196,14 @@ delta_q2_a <- delta_q1 %>%
         same2 = ifelse(Temp == lag(Temp, n= 2), 1, 0),
         same3 = ifelse(Temp == lag(Temp, n= 3), 1, 0),
         same4 = ifelse(Temp == lag(Temp, n= 4), 1, 0),
-        delete = ifelse(same1 + same2 + same3 + same4 ==4, 1, 0)) %>%
-  ungroup()
+        same5 = ifelse(Temp == lag(Temp, n=5), 1, 0),
+        same6 = ifelse(Temp == lag(Temp, n= 6), 1, 0),
+        same7 = ifelse(Temp == lag(Temp, n= 7), 1, 0),
+        same8 = ifelse(Temp == lag(Temp, n= 8), 1, 0),
+        same9 = ifelse(Temp == lag(Temp, n=9), 1, 0),
+        same10 = ifelse(Temp == lag(Temp, n= 10), 1, 0),
+        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + same7 + same8 + same9 + same10==10, 1, 0)) %>%
+    ungroup()
 
 # create a dataframe of all the "delete" rows
 delta_q2_b <- delta_q2_a %>%
@@ -223,7 +228,13 @@ sacR_q2_a <- sacR_q1 %>%
         same2 = ifelse(Temp == lag(Temp, n= 2), 1, 0),
         same3 = ifelse(Temp == lag(Temp, n= 3), 1, 0),
         same4 = ifelse(Temp == lag(Temp, n= 4), 1, 0),
-        delete = ifelse(same1 + same2 + same3 + same4 ==4, 1, 0)) %>%
+        same5 = ifelse(Temp == lag(Temp, n=5), 1, 0),
+        same6 = ifelse(Temp == lag(Temp, n= 6), 1, 0),
+        same7 = ifelse(Temp == lag(Temp, n= 7), 1, 0),
+        same8 = ifelse(Temp == lag(Temp, n= 8), 1, 0),
+        same9 = ifelse(Temp == lag(Temp, n=9), 1, 0),
+        same10 = ifelse(Temp == lag(Temp, n= 10), 1, 0),
+        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + same7 + same8 + same9 + same10==10, 1, 0)) %>%
   ungroup()
 
 # create a dataframe of all the "delete" rows
@@ -248,7 +259,13 @@ sanJR_q2_a <- sanJR_q1 %>%
         same2 = ifelse(Temp == lag(Temp, n= 2), 1, 0),
         same3 = ifelse(Temp == lag(Temp, n= 3), 1, 0),
         same4 = ifelse(Temp == lag(Temp, n= 4), 1, 0),
-        delete = ifelse(same1 + same2 + same3 + same4 ==4, 1, 0)) %>%
+        same5 = ifelse(Temp == lag(Temp, n=5), 1, 0),
+        same6 = ifelse(Temp == lag(Temp, n= 6), 1, 0),
+        same7 = ifelse(Temp == lag(Temp, n= 7), 1, 0),
+        same8 = ifelse(Temp == lag(Temp, n= 8), 1, 0),
+        same9 = ifelse(Temp == lag(Temp, n=9), 1, 0),
+        same10 = ifelse(Temp == lag(Temp, n= 10), 1, 0),
+        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + same7 + same8 + same9 + same10==10, 1, 0)) %>%
   ungroup()
 
 # create a dataframe of all the "delete" rows
@@ -283,11 +300,6 @@ sanJR_q3 <- sanJR_q2%>%
 * Individual files for each station: **STA_q3**
 
 ```{r q3 merge, message = FALSE, eval = FALSE}
-
-# Add some classifiers
-delta_q3$region <- "delta"
-sacR_q3$region <- "sacR"
-sanJR_q3$region <- "sanJR"
 
 allsta_q3 <- rbind(delta_q3, sacR_q3, sanJR_q3)
 
