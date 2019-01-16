@@ -9,7 +9,7 @@ output:
 ---
 
 Clear the environment.
-```{r include = FALSE}
+```{r clear, include = FALSE}
 rm(list=ls(all=TRUE))
 ```
 
@@ -91,6 +91,9 @@ CDECcompyrs_H <- function(first.year, last.year, station, sensor)
 }
 
 ```
+
+## Download Data
+### Fahrenheit - 15min interval
 
 After running the above two functions Vanessa set up, let's use it for compiling all the temperature datasets we want to include in the climate change synthesis datasets. 
 
@@ -651,7 +654,8 @@ write_csv(WCI_r, "station_files/stations_raw/WCI_r.csv")
 
 ```
 
-Below are stations already in Celsius (Sensor = 146)
+### Celsius - 15 min interval 
+Below, download stations already in Celsius (Sensor = 146)
 ```{r CelsiusRaw, message = FALSE, include= FALSE}
 library(dplyr)
 library(lubridate)
@@ -702,13 +706,17 @@ write_csv(SJR_C_r, "station_files/stations_raw/SJR_C_r.csv")
 
 ```
 
-Moving on from downloading data off the web. 
+## Standardize Data
 
 Now we will standardize all the files so they all have the same column names: datetime, station, Temp. All temperatures will be in Celsius.
 
-Load raw files, convert fahrenheit to celsius, then merge stations into station_files/stations_std/merged_std folder
+* Load raw files
+* Write merged raw files into station_files/stations_raw/merged folder
+* Convert fahrenheit to celsius
+* Create a "Temp" column so celsius and fahrenheit have the same column name
+* Merge stations into station_files/stations_std/merged_std folder
 
-```{r standardizeMerge}
+```{r standardizeMerge, message = FALSE}
 library(dplyr)
 library(lubridate)
 library(readr)
@@ -915,6 +923,7 @@ write_csv(sanJR_std, "station_files/stations_std/merged_std/sanJR_e_std.csv")
 
 ```
 
+### If necessary, load the standard merged files in. 
 Once the merged standardized files have been created, we can just load these files in.
 This will take a few minutes.
 ```{r load std, message = FALSE}
@@ -927,9 +936,11 @@ celsius_std <- read_csv("station_files/stations_std/merged_std/celsius_e_std.csv
 
 ```
 
-Merge celsius stations into other datasets. 
+## Merge Celsius into Fahrenheit datasets
 
-```{r merge celsius, message = FALSE}
+* Write celsius files to global environment
+* Incorporate celsius files into appropriate standardized datasets (delta_std, sacR_std, sanJR_std)
+```{r merge celsiusStdF, message = FALSE}
 ####################
 ### Write celsius files to global environment
 celsius_std$station <- as.factor(celsius_std$station) # need to factorize the "stations"
@@ -962,9 +973,9 @@ write_csv(allsta_std_f, "station_files/stations_std/merged_std/allsta_std_f.csv"
 
 ```
 
-Then write individual standardized files. 
+## Write "final" individual event files.  
 
-```{r std stations, message = FALSE}
+```{r individual std stations, message = FALSE}
 library(dplyr)
 # if you just want to rewrite one/a few stations: 
 #VNS_std <- sanJR_std %>% filter(station =="VNS")
@@ -984,10 +995,12 @@ for (name in levels(allsta_std_f$station)) {
   write_csv(tmp, fn)
 }
 ```
+
+## Download raw hourly data. Write files. 
 Next, download hourly data - write as raw data
 This includes all stations with data.
 
-```{r}
+```{r download raw hourly, message = FALSE}
 #### Hourly Stations ####
 library(lubridate)
 library(dplyr)
@@ -1227,12 +1240,16 @@ write_csv(HBP_C_h_r, "station_files/stations_raw/hourly/HBP_C_h_r.csv")
 
 ```
 
+## Merge and write hourly file. 
 1. Merge all hourly fahrenheit files together. 
 2. Merge all hourly celsius files together. 
-3. Merge these together into one big hourly file. 
-4. Write file.
+3. Standardize each separately.
+4. Merge these together into one big hourly file.
+5. Separate this file into region and add "region."
+6. Merge again.
+7. Write file.
 
-```{r message = FALSE}
+```{r merge and write hourly, message = FALSE}
 library(readr)
 
 ANC_h_r <- read_csv("station_files/stations_raw/hourly/ANC_h_r.csv")
@@ -1326,9 +1343,10 @@ write_csv(allsta_h_std, "station_files/stations_std/merged_std/hourly_std.csv")
 
 ```
 
+## Write individual standardized hourly files. 
 Load and write individual standardized files for each hourly station.
 
-```{r message = FALSE}
+```{r individual hourly, message = FALSE}
 library(readr)
 library(dplyr)
 #allsta_h_std <- read_csv("station_files/stations_std/merged_std/allsta_h_std.csv")
@@ -1351,9 +1369,13 @@ for (name in levels(allsta_h_std$station)) {
 
 ```
 
-Merge hourly and event data for those where both files are needed.
+## Combining hourly and event:
 
-```{r}
+* Read event data (std_f) to global environment.
+* Read hourly data (_h_std) to global environment.
+* Merge hourly and event data for those where both files are needed (individual stations).
+
+```{r global hourlyEventMerge, message = FALSE}
 # Write files to global environment to be merged
 
 # event
@@ -1386,63 +1408,10 @@ write_csv(GLN_m_std,"station_files/stations_std/GLN_m_std.csv")
 
 ```
 
-read in 
-```{r}
+## Merge and write regional datasets.These contain hourly and event data. 
 
 
-ANC_h_std <- read_csv("station_files/stations_std/hourly/ANC_h_std.csv")
-ANH_h_std <- read_csv("station_files/stations_std/hourly/ANH_h_std.csv")
-BDL_h_std <- read_csv("station_files/stations_std/hourly/BDL_h_std.csv")
-BKS_h_std <- read_csv("station_files/stations_std/hourly/BKS_h_std.csv")
-BLL_h_std <- read_csv("station_files/stations_std/hourly/BLL_h_std.csv")
-CCS_h_std <- read_csv("station_files/stations_std/hourly/CCS_h_std.csv")
-CLL_h_std <- read_csv("station_files/stations_std/hourly/CLL_h_std.csv")
-CNT_h_std <- read_csv("station_files/stations_std/hourly/CNT_h_std.csv")
-DMC_h_std <- read_csv("station_files/stations_std/hourly/DMC_h_std.csv")
-CPP_h_std <- read_csv("station_files/stations_std/hourly/CPP_h_std.csv")
-DV7_h_std <- read_csv("station_files/stations_std/hourly/DV7_h_std.csv")
-EMM_h_std <- read_csv("station_files/stations_std/hourly/EMM_h_std.csv")
-FRP_h_std <- read_csv("station_files/stations_std/hourly/FRP_h_std.csv")
-GLN_h_std <- read_csv("station_files/stations_std/hourly/GLN_h_std.csv")
-HBP_h_std <- read_csv("station_files/stations_std/hourly/HBP_h_std.csv") # will need to change
-HLL_h_std <- read_csv("station_files/stations_std/hourly/HLL_h_std.csv")
-IBS_h_std <- read_csv("station_files/stations_std/hourly/IBS_h_std.csv") 
-JER_h_std <- read_csv("station_files/stations_std/hourly/JER_h_std.csv")
-KA0_h_std <- read_csv("station_files/stations_std/hourly/KA0_h_std.csv")
-MAL_h_std <- read_csv("station_files/stations_std/hourly/MAL_h_std.csv")
-MSD_h_std <- read_csv("station_files/stations_std/hourly/MSD_h_std.csv")
-MTB_h_std <- read_csv("station_files/stations_std/hourly/MTB_h_std.csv")
-MRZ_h_std <- read_csv("station_files/stations_std/hourly/MRZ_h_std.csv") 
-NSL_h_std <- read_csv("station_files/stations_std/hourly/NSL_h_std.csv")
-PCT_h_std <- read_csv("station_files/stations_std/hourly/PCT_h_std.csv")
-PTS_h_std <- read_csv("station_files/stations_std/hourly/PTS_h_std.csv")
-RIV_h_std <- read_csv("station_files/stations_std/hourly/RIV_h_std.csv")
-ROR_h_std <- read_csv("station_files/stations_std/hourly/ROR_h_std.csv")
-RPN_h_std <- read_csv("station_files/stations_std/hourly/RPN_h_std.csv")
-RVB_h_std <- read_csv("station_files/stations_std/hourly/RVB_h_std.csv")
-SAL_h_std <- read_csv("station_files/stations_std/hourly/SAL_h_std.csv")
-SBC_h_std <- read_csv("station_files/stations_std/hourly/SBC_h_std.csv")
-SJL_h_std <- read_csv("station_files/stations_std/hourly/SJL_h_std.csv")
-SRH_h_std <- read_csv("station_files/stations_std/hourly/SRH_h_std.csv")
-STI_h_std <- read_csv("station_files/stations_std/hourly/STI_h_std.csv")
-UNI_h_std <- read_csv("station_files/stations_std/hourly/UNI_h_std.csv")
-VER_h_std <- read_csv("station_files/stations_std/hourly/VER_h_std.csv")
-VIC_h_std <- read_csv("station_files/stations_std/hourly/VIC_h_std.csv")
-VOL_h_std <- read_csv("station_files/stations_std/hourly/VOL_h_std.csv") 
-CLC_h_std <- read_csv("station_files/stations_std/hourly/CLC_h_std.csv")
-DYR_h_std <- read_csv("station_files/stations_std/hourly/DYR_h_std.csv")
-
-#SWE_std <- read_csv("station_files/stations_std/SWE_std.csv")
-
-```
-
-
-
-
-Make larger delta, sacR, sanJR and merged files that have one single file per station. 
-Write files.
-
-```{r}
+```{r merge single, message = FALSE}
 delta_std_single <- rbind(ANC_h_std, BAC_std_f, BET_std_f, BKS_h_std, BLP_std_f, CCS_h_std, CLC_h_std, CLL_h_std,
                           CNT_h_std, CPP_h_std, CSE_std_f, CYG_std_f, DMC_h_std, DV7_h_std, DYR_h_std,
                           EMM_h_std, FAL_std_f, FLT_std_f, FRK_std_f, FRP_h_std, GOD_std_f, GYS_std_f, 
@@ -1475,15 +1444,13 @@ write_csv(allsta_std_single, "station_files/stations_sin/merged/allsta_std_sin.c
 
 ```
 
+### Write individual files (each station now has ONE file containing hourly and event data). 
 
-Write individual station files. 
-
-```{r}
+```{r individual single files, message = FALSE}
 library(readr)
 allsta <- allsta_std_single # If continuing from above
 # If loading file
-allsta <-  read_csv("station_files/stations_sin/merged/allsta_std_sin.csv")
-allsta$qa <- "none"
+# allsta <-  read_csv("station_files/stations_sin/merged/allsta_std_sin.csv")
 allsta$station <- as.factor(allsta$station) # need to factorize the "stations"
 
 #Get the list of unique MP names
