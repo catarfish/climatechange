@@ -53,10 +53,9 @@ for (name in levels(allsta_q5$station)) {
 ```
 
 
-## Plot data 
-### Compare pre-outlier testing with post-outlier testing
-Outlier testing here is the modified Z-score method 
-median 
+## Compare pre-outlier testing with post-outlier testing
+### Pick stations, make one data frame.
+
 ```{r plots, message = FALSE, echo = FALSE}
 
 library(ggplot2)
@@ -66,73 +65,46 @@ library(dplyr)
 library(plyr)
 
 # Stations to examine
-teststa <- c("BDL", "GLC", "PTS", "MAL", "SRH", "MRZ", "UNI", "FRP", 
-             "SAL", "STI","VIC", "HLL", "NSL")
-             
+teststa <- c("FRP","MRZ","VIC","UNI", #delta
+             "BDL", "MAL","NSL","SRH", #sacR
+             "MTB","RPN","VER") #sanJR
+
+# Make one dataset to look at them all             
 testset_q3 <- allsta_q3 %>% filter(station %in% teststa)
 testset_q4 <- allsta_q4 %>% filter(station %in% teststa) %>% subset(select = c(1:9,13))
 testset_q5 <- allsta_q5 %>% filter(station %in% teststa) %>% subset(select = c(1:9,15))
-testall <- cbind(testset_q3, testset_q4, testset_q5)
+testall <- rbind(testset_q3, testset_q4, testset_q5)
 testall$qa <- as.factor(testall$qa)
 
-BDL_com <-  rbindlist(list(BDL_q3, BDL_q4[,c(1:9,13)], BDL_q5[,c(1:9,15)]))
-GLC_com <- rbindlist(list(GLC_q3, GLC_q4[,c(1:9,13)], GLC_q5[,c(1:9,15)]))
-PTS_com <- rbindlist(list(PTS_q3, PTS_q4[,c(1:9,13)], GLC_q5[,c(1:9,15)]))
-MAL_com <-  rbindlist(list(MAL_q3, MAL_q4[,c(1:9,13)], MAL_q5[,c(1:9,15)]))
-SRH_com <-  rbindlist(list(SRH_q3, SRH_q4[,c(1:9,13)], SRH_q5[,c(1:9,15)]))
-MRZ_com <-  rbindlist(list(MRZ_q3, MRZ_q4[,c(1:9,13)], MRZ_q5[,c(1:9,15)]))
-UNI_com <-  rbindlist(list(UNI_q3, UNI_q4[,c(1:9,13)], UNI_q5[,c(1:9,15)]))
-FRP_com <-  rbindlist(list(FRP_q3, FRP_q4[,c(1:9,13)], FRP_q5[,c(1:9,15)]))
 
-BDL_com$qa <- as.factor(BDL_com$qa)
-GLC_com$qa <- as.factor(GLC_com$qa)
-PTS_com$qa <- as.factor(PTS_com$qa)
-MAL_com$qa <- as.factor(MAL_com$qa)
-SRH_com$qa <- as.factor(SRH_com$qa)
-MRZ_com$qa <- as.factor(MRZ_com$qa)
-UNI_com$qa <- as.factor(UNI_com$qa)
-FRP_com$qa <- as.factor(FRP_com$qa)
+```
 
-ggplot(BDL_com, aes(datetime, Temp, col = qa, shape = qa)) +
+
+### Make plots 
+```{r plots}
+# One plot at a time: goes in console
+testall %>% 
+  filter(station=="BDL")%>%
+  ggplot(aes(datetime, Temp, col = qa, shape = qa)) +
   geom_point(alpha=0.5) +
   labs(title = "BDL") +
   scale_x_datetime(breaks = "1 year", labels = date_format("%Y"))+
   theme_bw()
 
-ggplot(GLC_com, aes(datetime, Temp, col = qa, shape = qa)) +
-  geom_point(alpha=0.5) +
-  labs(title = "GLC") +
-  theme_bw()
+# List of all of the plots (by station)
+plist <- by(testall, testall$station, function(i) {
+  p <- ggplot(i)+
+    geom_point(aes(datetime, Temp, col = qa, shape = qa), alpha = 0.5) +
+    labs(title = i) +
+    scale_x_datetime(breaks = "1 year", labels = date_format("%Y"))+
+    theme_bw()
+})
 
-ggplot(PTS_com, aes(datetime, Temp, col = qa, shape = qa)) +
-  geom_point(alpha=0.5) +
-  labs(title = "PTS") +
-  theme_bw()
+# Automatically saves images in list (above) to your working directory folder.
+lapply(names(plist), 
+       function(x) ggsave(filename=paste(x,".png",sep=""), plot=plist[[x]], bg = "transparent"))
 
-ggplot(MAL_com, aes(datetime, Temp, col = qa, shape = qa)) +
-  geom_point(alpha=0.5) +
-  labs(title = "MAL") +
-  theme_bw()
 
-ggplot(SRH_com, aes(datetime, Temp, col = qa, shape = qa)) +
-  geom_point(alpha=0.5) +
-  labs(title = "SRH") +
-  theme_bw()
-  
-ggplot(MRZ_com, aes(datetime, Temp, col = qa, shape = qa)) +
-  geom_point(alpha=0.5) +
-  labs(title = "MRZ") +
-  theme_bw()
-  
-ggplot(UNI_com, aes(datetime, Temp, col = qa, shape = qa)) +
-  geom_point(alpha=0.5) +
-  labs(title = "UNI") +
-  theme_bw()
-  
-ggplot(FRP_com, aes(datetime, Temp, col = qa, shape = qa)) +
-  geom_point(alpha=0.5) +
-  labs(title = "FRP") +
-  theme_bw()
 ```
 
 
