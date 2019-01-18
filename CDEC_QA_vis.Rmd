@@ -62,6 +62,18 @@ median
 library(ggplot2)
 library(scales)
 library(data.table)
+library(dplyr)
+library(plyr)
+
+# Stations to examine
+teststa <- c("BDL", "GLC", "PTS", "MAL", "SRH", "MRZ", "UNI", "FRP", 
+             "SAL", "STI","VIC", "HLL", "NSL")
+             
+testset_q3 <- allsta_q3 %>% filter(station %in% teststa)
+testset_q4 <- allsta_q4 %>% filter(station %in% teststa) %>% subset(select = c(1:9,13))
+testset_q5 <- allsta_q5 %>% filter(station %in% teststa) %>% subset(select = c(1:9,15))
+testall <- cbind(testset_q3, testset_q4, testset_q5)
+testall$qa <- as.factor(testall$qa)
 
 BDL_com <-  rbindlist(list(BDL_q3, BDL_q4[,c(1:9,13)], BDL_q5[,c(1:9,15)]))
 GLC_com <- rbindlist(list(GLC_q3, GLC_q4[,c(1:9,13)], GLC_q5[,c(1:9,15)]))

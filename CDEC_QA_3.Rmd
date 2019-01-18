@@ -329,8 +329,6 @@ for (name in levels(allsta_q3$station)) {
   #Save the CSV file for each station
   write_csv(tmp,fn)
 }
-
-
 ```
 
 ## Write q3 to global environment
@@ -529,7 +527,7 @@ for (name in levels(allsta_q4$station)) {
 ```{r q4 global, message = FALSE}
 # Read in overall files (if needed)
 setwd("P:/ClimateChange/R_code/")
-allsta_q4 <- read_csv("station_files/stations_qa/merged/allsta_q4.csv")
+#allsta_q4 <- read_csv("station_files/stations_qa/merged/allsta_q4.csv")
 
 ### Write each station file to global environment
 allsta_q4$station <- as.factor(allsta_q4$station) # need to factorize the "stations"
@@ -565,7 +563,7 @@ write_csv(allsta_q5, "station_files/stations_qa/merged/allsta_q5.csv")
 
 ### Individual files to csv
 # If loading file
-allsta_q5 <-  read_csv("station_files/stations_qa/merged/allsta_q5.csv")
+#allsta_q5 <-  read_csv("station_files/stations_qa/merged/allsta_q5.csv")
 
 # write each file as a csv
 allsta_q5$station <- as.factor(allsta_q5$station) # need to factorize the "stations"
@@ -581,12 +579,12 @@ for (name in levels(allsta_q5$station)) {
 
 ```
 
-## Write station files to global environment
+## Write q5 station files to global environment
 
 ```{r q5 global, message = FALSE}
 # Read in overall files (if needed)
 setwd("P:/ClimateChange/R_code/")
-allsta_q5 <- read_csv("station_files/stations_qa/merged/allsta_q5.csv")
+#allsta_q5 <- read_csv("station_files/stations_qa/merged/allsta_q5.csv")
 
 ### Write each station file to global environment
 allsta_q5$station <- as.factor(allsta_q5$station) # need to factorize the "stations"
