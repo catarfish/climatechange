@@ -57,22 +57,17 @@ for (name in levels(allsta_q5$station)) {
 ### Pick stations, make one data frame.
 
 ```{r plots, message = FALSE, echo = FALSE}
-
-library(ggplot2)
-library(scales)
-library(data.table)
 library(dplyr)
-library(plyr)
 
-# Stations to examine
+# Select some stations to look at QA
 teststa <- c("FRP","MRZ","VIC","UNI", #delta
              "BDL", "MAL","NSL","SRH", #sacR
              "MTB","RPN","VER") #sanJR
 
 # Make one dataset to look at them all             
 testset_q3 <- allsta_q3 %>% filter(station %in% teststa)
-testset_q4 <- allsta_q4 %>% filter(station %in% teststa) %>% subset(select = c(1:9,13))
-testset_q5 <- allsta_q5 %>% filter(station %in% teststa) %>% subset(select = c(1:9,15))
+testset_q4 <- allsta_q4 %>% filter(station %in% teststa) %>% subset(select = c(1:10))
+testset_q5 <- allsta_q5 %>% filter(station %in% teststa) %>% subset(select = c(1:10))
 testall <- rbind(testset_q3, testset_q4, testset_q5)
 testall$qa <- as.factor(testall$qa)
 
@@ -82,6 +77,9 @@ testall$qa <- as.factor(testall$qa)
 
 ### Make plots 
 ```{r plots}
+library(ggplot2)
+library(scales)
+library(data.table)
 # One plot at a time: goes in console
 testall %>% 
   filter(station=="BDL")%>%
@@ -97,7 +95,8 @@ plist <- by(testall, testall$station, function(i) {
     geom_point(aes(datetime, Temp, col = qa, shape = qa), alpha = 0.5) +
     labs(title = i) +
     scale_x_datetime(breaks = "1 year", labels = date_format("%Y"))+
-    theme_bw()
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
 })
 
 # Automatically saves images in list (above) to your working directory folder.
