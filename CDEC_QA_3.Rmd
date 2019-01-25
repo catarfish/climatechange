@@ -49,6 +49,7 @@ delta_std$yrMon <- format(as.Date(delta_std$date), "%y-%m")
 delta_std$hour <- hour(delta_std$datetime)
 delta_std$minute <- minute(delta_std$datetime)
 
+
 sacR_std$date <- as.Date(sacR_std$datetime, format = "%m/%d/%y")
 sacR_std$year <- year(sacR_std$datetime)
 sacR_std$yrMon <- format(as.Date(sacR_std$date), "%y-%m")
@@ -62,6 +63,9 @@ sanJR_std$yrMon <- format(as.Date(sanJR_std$date), "%y-%m")
 #sanJR_std$ymon1 <- as.Date(paste(sanJR_std$yrMon, "-01", sep=""))
 sanJR_std$hour <- hour(sanJR_std$datetime)
 sanJR_std$minute <- minute(sanJR_std$datetime)
+
+# Remove unnecessaries
+rm(delta_std_0, sacR_std_0, sanJR_std_0)
 ```
 
 ## Convert to hourly
@@ -169,11 +173,13 @@ sanJR_q1 <- sanJR_H %>%
 # Check that the above is doing the right thing. 
 a <- sanJR_q1 %>% filter(date == "2005-01-07")
 
+# Remove unnecessaries
+rm(delta_q1_a, sacR_q1_a, sanJR_q1_a)
 
 ```
 
 
-## QA2) Remove if there are more than 5 repeating values in a row
+## QA2) Remove if there are more than 9 repeating values in a row
 
 1. Create new columns indicating whether the temperature at x hour is the same as that of x-1 hours, x-2 hours, x-3 hours, x-4 hours. (1 = yes, 0 = no)
 2. Add the columns up. If all values are the same, "delete" = 4. 
@@ -188,7 +194,7 @@ library(dplyr)
 delta_q1$Temp <- as.numeric(delta_q1$Temp)
 
 # create columns that are temp-1, temp-2, temp-3, temp-4 (position-1, not actual temperature-1)
-# for columns where there are 5 values repeating in a row (in one day), new variable "delete" = 1
+# for columns where there are 12 values repeating in a row (in one day), new variable "delete" = 1
 delta_q2_a <- delta_q1 %>%
   group_by(station, date) %>%
   arrange(station, date, hour) %>%
@@ -201,8 +207,10 @@ delta_q2_a <- delta_q1 %>%
         same7 = ifelse(Temp == lag(Temp, n= 7), 1, 0),
         same8 = ifelse(Temp == lag(Temp, n= 8), 1, 0),
         same9 = ifelse(Temp == lag(Temp, n=9), 1, 0),
-        same10 = ifelse(Temp == lag(Temp, n= 10), 1, 0),
-        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + same7 + same8 + same9 + same10==10, 1, 0)) %>%
+        same10 = ifelse(Temp == lag(Temp, n=10), 1, 0),
+        same11 = ifelse(Temp == lag(Temp, n=11), 1, 0),
+        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + 
+                          same7 + same8 + same9 + same10 + same11 ==11, 1, 0)) %>%
     ungroup()
 
 # create a dataframe of all the "delete" rows
@@ -215,12 +223,11 @@ delta_q2_b <- delta_q2_a %>%
 delta_q2 <- delta_q1 %>%
   anti_join(delta_q2_b,by = c("station", "date"))
 
-
 ### sacR
 sacR_q1$Temp <- as.numeric(sacR_q1$Temp)
 
 # create columns that are temp-1, temp-2, temp-3, temp-4 (position-1, not actual temperature-1)
-# for columns where there are 5 values repeating in a row (in one day), new variable "delete" = 1
+# for columns where there are 12 values repeating in a row (in one day), new variable "delete" = 1
 sacR_q2_a <- sacR_q1 %>%
   group_by(station, date) %>%
   arrange(station, date, hour) %>%
@@ -233,8 +240,10 @@ sacR_q2_a <- sacR_q1 %>%
         same7 = ifelse(Temp == lag(Temp, n= 7), 1, 0),
         same8 = ifelse(Temp == lag(Temp, n= 8), 1, 0),
         same9 = ifelse(Temp == lag(Temp, n=9), 1, 0),
-        same10 = ifelse(Temp == lag(Temp, n= 10), 1, 0),
-        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + same7 + same8 + same9 + same10==10, 1, 0)) %>%
+                same10 = ifelse(Temp == lag(Temp, n=10), 1, 0),
+        same11 = ifelse(Temp == lag(Temp, n=11), 1, 0),
+        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + 
+                          same7 + same8 + same9 + same10 + same11 ==11, 1, 0)) %>%
   ungroup()
 
 # create a dataframe of all the "delete" rows
@@ -251,7 +260,7 @@ sacR_q2 <- sacR_q1 %>%
 sanJR_q1$Temp <- as.numeric(sanJR_q1$Temp)
 
 # create columns that are temp-1, temp-2, temp-3, temp-4 (position-1, not actual temperature-1)
-# for columns where there are 5 values repeating in a row (in one day), new variable "delete" = 1
+# for columns where there are 12 values repeating in a row (in one day), new variable "delete" = 1
 sanJR_q2_a <- sanJR_q1 %>%
   group_by(station, date) %>%
   arrange(station, date, hour) %>%
@@ -264,8 +273,10 @@ sanJR_q2_a <- sanJR_q1 %>%
         same7 = ifelse(Temp == lag(Temp, n= 7), 1, 0),
         same8 = ifelse(Temp == lag(Temp, n= 8), 1, 0),
         same9 = ifelse(Temp == lag(Temp, n=9), 1, 0),
-        same10 = ifelse(Temp == lag(Temp, n= 10), 1, 0),
-        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + same7 + same8 + same9 + same10==10, 1, 0)) %>%
+        same10 = ifelse(Temp == lag(Temp, n=10), 1, 0),
+        same11 = ifelse(Temp == lag(Temp, n=11), 1, 0),
+        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + 
+                          same7 + same8 + same9 + same10 + same11 ==11, 1, 0)) %>%
   ungroup()
 
 # create a dataframe of all the "delete" rows
@@ -278,6 +289,9 @@ sanJR_q2_b <- sanJR_q2_a %>%
 sanJR_q2 <- sanJR_q1 %>%
   anti_join(sanJR_q2_b,by = c("station", "date"))
 
+# Remove unnecessaries
+rm(delta_q2_a, sacR_q2_a, sanJR_q2_a,
+   delta_q2_b, sacR_q2_b, sanJR_q2_b)
 ```
 
 
@@ -294,7 +308,7 @@ sanJR_q3 <- sanJR_q2%>%
 ```
 
 
-## Merge and write files up to this point
+## Q3: Merge and write files up to this point
 
 * One large file with all stations: **allsta_q3**
 * Individual files for each station: **STA_q3**
@@ -356,70 +370,74 @@ for (name in levels(allsta_q3$station)) {
 4. Filter out values with score > 3.5 (Iglewicz & Hoaglin 1993)
 
 ```{r MAD outlier, message = FALSE}
+library(lubridate)
+library(ggplot2)
+### test
+delta_q3$week <- week(delta_q3$date)
+delta_q3$yrWk <- paste0(delta_q3$year, "-", delta_q3$week)
+sacR_q3$week <- week(sacR_q3$date)
+sacR_q3$yrWk <- paste0(sacR_q3$year, "-", sacR_q3$week)
+sanJR_q3$week <- week(sanJR_q3$date)
+sanJR_q3$yrWk <- paste0(sanJR_q3$year, "-", sanJR_q3$week)
+
 ### delta
- 
+
 # Calculate median, MAD, lower and upper ranges for each day
 delta_q4_a <- delta_q3 %>%
-  group_by(station, date) %>%
+  group_by(station, yrWk) %>%
    summarize(
     med = median(Temp),
     MAD = mad(Temp))
     
 # Add calculated daily median, ranges to original table
-delta_q4_b <- left_join(delta_q3, delta_q4_a, by = c("station", "date"))
+delta_q4_b <- left_join(delta_q3, delta_q4_a, by = c("station", "yrWk"))
 
 # Calculate modified Z-score
 # 0.6745 = 75th percentile
-delta_q4_c <- delta_q4_b %>%
+# Delete temperatures not in range
+delta_q4 <- delta_q4_b %>%
   group_by(station) %>%
-  mutate(modZ = abs(0.6745*(Temp - med)/MAD))
-  
-# Delete temperatures outside of range
-delta_q4 <- delta_q4_c %>%
+  mutate(modZ = abs(0.6745*(Temp - med)/MAD)) %>%
   filter(modZ < 3.5)
-
+  
 ### sacR
 # Calculate median, MAD, lower and upper ranges for each day
 sacR_q4_a <- sacR_q3 %>%
-  group_by(station, date) %>%
+  group_by(station, yrWk) %>%
   summarize(
     med = median(Temp),
     MAD = mad(Temp))
 
 # Add calculated daily median, ranges to original table
-sacR_q4_b <- left_join(sacR_q3, sacR_q4_a, by = c("station", "date"))
+sacR_q4_b <- left_join(sacR_q3, sacR_q4_a, by = c("station", "yrWk"))
 
 # Calculate modified Z-score
 # 0.6745 = 75th percentile
-sacR_q4_c <- sacR_q4_b %>%
+sacR_q4 <- sacR_q4_b %>%
   group_by(station) %>%
-  mutate(modZ = abs(0.6745*(Temp - med)/MAD))
-
-# Delete temperatures outside of lower or upper ranges
-sacR_q4 <- sacR_q4_c %>%
+  mutate(modZ = abs(0.6745*(Temp - med)/MAD)) %>%
   filter(modZ < 3.5)
 
 ### sanJR
 # Calculate median, MAD, lower and upper ranges for each day
 sanJR_q4_a <- sanJR_q3 %>%
-  group_by(station, date) %>%
+  group_by(station, yrWk) %>%
   summarize(
     med = median(Temp),
     MAD = mad(Temp))
 
 # Add calculated daily median, ranges to original table
-sanJR_q4_b <- left_join(sanJR_q3, sanJR_q4_a, by = c("station", "date"))
+sanJR_q4_b <- left_join(sanJR_q3, sanJR_q4_a, by = c("station", "yrWk"))
 
 # Calculate modified Z-score
 # 0.6745 = 75th percentile
-sanJR_q4_c <- sanJR_q4_b %>%
+sanJR_q4 <- sanJR_q4_b %>%
   group_by(station) %>%
-  mutate(modZ = abs(0.6745*(Temp - med)/MAD))
-
-# Delete temperatures outside of lower or upper ranges
-sanJR_q4 <- sanJR_q4_c %>%
+  mutate(modZ = abs(0.6745*(Temp - med)/MAD)) %>%
   filter(modZ < 3.5)
 
+# Remove unnecessaries
+rm(delta_q4_a, sacR_q4_a, sanJR_q4_a)
 ```
 
 ## QA5) Outlier Method 2: Tukey Method
@@ -432,7 +450,7 @@ sanJR_q4 <- sanJR_q4_c %>%
  
 # Calculate median, MAD, lower and upper ranges for each day
 delta_q5_a <- delta_q3 %>%
-  group_by(station, date) %>%
+  group_by(station, yrWk) %>%
    summarize(Q1 = quantile(Temp, probs = 0.25), 
             Q3 = quantile(Temp, probs = 0.75),
             IQR = Q3-Q1,
@@ -440,7 +458,7 @@ delta_q5_a <- delta_q3 %>%
             ll = Q1 - 1.5 * IQR)
     
 # Add calculated daily median, ranges to original table
-delta_q5_b <- left_join(delta_q3, delta_q5_a, by = c("station", "date"))
+delta_q5_b <- left_join(delta_q3, delta_q5_a, by = c("station", "yrWk"))
 
 # Delete temperatures outside of range
 delta_q5 <- delta_q5_b %>%
@@ -449,7 +467,7 @@ delta_q5 <- delta_q5_b %>%
 ### sacR
 # Calculate median, MAD, lower and upper ranges for each day
 sacR_q5_a <- sacR_q3 %>%
-  group_by(station, date) %>%
+  group_by(station, yrWk) %>%
   summarize(Q1 = quantile(Temp, probs = 0.25), 
             Q3 = quantile(Temp, probs = 0.75),
             IQR = Q3-Q1,
@@ -457,7 +475,7 @@ sacR_q5_a <- sacR_q3 %>%
             ll = Q1 - 1.5 * IQR)
 
 # Add calculated daily median, ranges to original table
-sacR_q5_b <- left_join(sacR_q3, sacR_q5_a, by = c("station", "date"))
+sacR_q5_b <- left_join(sacR_q3, sacR_q5_a, by = c("station", "yrWk"))
 
 # Delete temperatures outside of lower or upper ranges
 sacR_q5 <- sacR_q5_b %>%
@@ -466,7 +484,7 @@ sacR_q5 <- sacR_q5_b %>%
 ### sanJR
 # Calculate median, MAD, lower and upper ranges for each day
 sanJR_q5_a <- sanJR_q3 %>%
-  group_by(station, date) %>%
+  group_by(station, yrWk) %>%
    summarize(Q1 = quantile(Temp, probs = 0.25), 
             Q3 = quantile(Temp, probs = 0.75),
             IQR = Q3-Q1,
@@ -474,17 +492,18 @@ sanJR_q5_a <- sanJR_q3 %>%
             ll = Q1 - 1.5 * IQR)
 
 # Add calculated daily median, ranges to original table
-sanJR_q5_b <- left_join(sanJR_q3, sanJR_q5_a, by = c("station", "date"))
+sanJR_q5_b <- left_join(sanJR_q3, sanJR_q5_a, by = c("station", "yrWk"))
 
 # Delete temperatures outside of lower or upper ranges
 sanJR_q5 <- sanJR_q5_b %>%
   filter(Temp>ll & Temp<ul)
 
+# Remove unnecessaries
+rm(delta_q5_a, sacR_q5_a, sanJR_q5_a)
 ```
 
 
-
-## Merge the finished products
+## Q4: Merge the finished products
 
 * One large file with all stations: **allsta_q4**
 * Individual files for each station: **STA_q4**
@@ -499,8 +518,7 @@ sacR_q4$qa <- "q4"
 sanJR_q4$qa <- "q4"
 write_csv(delta_q4, "station_files/stations_qa/merged/delta_q4.csv")
 write_csv(sacR_q4, "station_files/stations_qa/merged/sacR_q4.csv")
-write_csv(sanJR_q4, "station_files/s
-          tations_qa/merged/sanJR_q4.csv")
+write_csv(sanJR_q4, "station_files/stations_qa/merged/sanJR_q4.csv")
 write_csv(allsta_q4, "station_files/stations_qa/merged/allsta_q4.csv")
 
 ### Individual files to csv
@@ -518,32 +536,10 @@ for (name in levels(allsta_q4$station)) {
   #Save the CSV file for each station
   write_csv(tmp,fn)
 }
-
-
 ```
 
-## Write station files to global environment
 
-```{r q4 global, message = FALSE}
-# Read in overall files (if needed)
-setwd("P:/ClimateChange/R_code/")
-#allsta_q4 <- read_csv("station_files/stations_qa/merged/allsta_q4.csv")
-
-### Write each station file to global environment
-allsta_q4$station <- as.factor(allsta_q4$station) # need to factorize the "stations"
-
-for (name in levels(allsta_q4$station)) {
-  temp=subset(allsta_q4, station==name)
-  fn=assign(paste0(name,"_q4"),temp, envir = globalenv())
-  }
-
-# In case you want to read one station in: 
-#BAC_q4 <- allsta_q4 %>% filter(station == "BAC")
-
-
-```
-
-## Merge the finished products
+## Q5: Merge the finished products
 
 * One large file with all stations: **allsta_q4**
 * Individual files for each station: **STA_q4**
@@ -576,6 +572,28 @@ for (name in levels(allsta_q5$station)) {
   #Save the CSV file for each station
   write_csv(tmp,fn)
 }
+
+```
+
+
+## Write q4 station files to global environment
+
+```{r q4 global, message = FALSE}
+# Read in overall files (if needed)
+setwd("P:/ClimateChange/R_code/")
+#allsta_q4 <- read_csv("station_files/stations_qa/merged/allsta_q4.csv")
+
+### Write each station file to global environment
+allsta_q4$station <- as.factor(allsta_q4$station) # need to factorize the "stations"
+
+for (name in levels(allsta_q4$station)) {
+  temp=subset(allsta_q4, station==name)
+  fn=assign(paste0(name,"_q4"),temp, envir = globalenv())
+  }
+
+# In case you want to read one station in: 
+#BAC_q4 <- allsta_q4 %>% filter(station == "BAC")
+
 
 ```
 
