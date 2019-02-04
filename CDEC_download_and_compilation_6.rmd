@@ -98,7 +98,8 @@ CDECcompyrs_H <- function(first.year, last.year, station, sensor)
 After running the above two functions Vanessa set up, let's use it for compiling all the temperature datasets we want to include in the climate change synthesis datasets. 
 
 We likely want to grab all the historical data available if it is there. The code will grab what is available based on inputted dates, and insert "NA" for other dates. 
-Below isthe code for stations in Fahrenheit (sensor = 25)
+
+Below is the code for stations in Fahrenheit (sensor = 25)
 
 ```{r FahrenheitRaw, message=FALSE, warning = FALSE, include = FALSE}
 
@@ -655,7 +656,9 @@ write_csv(WCI_r, "station_files/stations_raw/WCI_r.csv")
 ```
 
 ### Celsius - 15 min interval 
+
 Below, download stations already in Celsius (Sensor = 146)
+
 ```{r CelsiusRaw, message = FALSE, include= FALSE}
 library(dplyr)
 library(lubridate)
@@ -706,15 +709,19 @@ write_csv(SJR_C_r, "station_files/stations_raw/SJR_C_r.csv")
 
 ```
 
-## Standardize Data
+## Standardize Data and Write files
 
 Now we will standardize all the files so they all have the same column names: datetime, station, Temp. All temperatures will be in Celsius.
 
 * Load raw files
-* Write merged raw files into station_files/stations_raw/merged folder
+* Merge and write **raw files** into station_files/stations_raw/merged folder
+  + Celsius
+  + Delta (+East Bay and Mokelumne)
+  + sacR  
+  + sanJR (+StanislausR)
 * Convert fahrenheit to celsius
 * Create a "Temp" column so celsius and fahrenheit have the same column name
-* Merge stations into station_files/stations_std/merged_std folder
+* Merge **standardized station** data into larger compiled files and write to station_files/stations_std/merged_std folder
 
 ```{r standardizeMerge, message = FALSE}
 library(dplyr)
@@ -750,7 +757,6 @@ BET_r <- read_csv("station_files/stations_raw/BET_r.csv")
 BLP_r <- read_csv("station_files/stations_raw/BLP_r.csv")
 CSE_r <- read_csv("station_files/stations_raw/CSE_r.csv")
 CYG_r <- read_csv("station_files/stations_raw/CYG_r.csv")
-ECD_r <- read_csv("station_files/stations_raw/ECD_r.csv") # celsius only
 FAL_r <- read_csv("station_files/stations_raw/FAL_r.csv")
 FLT_r <- read_csv("station_files/stations_raw/FLT_r.csv")
 FRK_r <- read_csv("station_files/stations_raw/FRK_r.csv")
@@ -780,14 +786,15 @@ TEA_r <- read_csv("station_files/stations_raw/TEA_r.csv")
 VCU_r <- read_csv("station_files/stations_raw/VCU_r.csv")
 VOL_r <- read_csv("station_files/stations_raw/VOL_r.csv")
 
+
 ##### East Bay/ Mokelumne ####
 MRZ_r <- read_csv("station_files/stations_raw/MRZ_r.csv")
-MKN_r <- read_csv("station_files/stations_raw/MKN_r.csv") # celsius only
 MOK_r <- read_csv("station_files/stations_raw/MOK_r.csv")
 NMR_r <- read_csv("station_files/stations_raw/NMR_r.csv")
 SMR_r <- read_csv("station_files/stations_raw/SMR_r.csv")
+# MKN and ECD are in celsius and will eventually be merged in
 
-#Bind all the temperature sensors together into a single dataframe 
+#Bind all the temperature sensors together into a single dataframe and write raw dataset
 delta_r <- rbind(BAC_r, BET_r, BLP_r, CSE_r, CYG_r, FAL_r, FLT_r, FRK_r,
             GOD_r, GYS_r, GZB_r, GZL_r, HON_r, HUN_r, IBS_r, MDM_r, MHO_r, MSL_r,
             OBI_r, ODM_r, OH4_r, OLD_r, OSJ_r, PCO_r, PPT_r, ROR_r, RSL_r, RYC_r, 
@@ -795,16 +802,15 @@ delta_r <- rbind(BAC_r, BET_r, BLP_r, CSE_r, CYG_r, FAL_r, FLT_r, FRK_r,
             MRZ_r, MOK_r, NMR_r, SMR_r)
 write_csv(delta_r, "station_files/stations_raw/merged/delta_e_r.csv")
 
-#make a new column and convert temperature from fahrenheit to celsius
+#Make a new column and convert temperature from fahrenheit to celsius
 delta_r$s25 <- as.numeric(delta_r$s25)
 delta_r$Temp <- ((delta_r$s25)-32)/1.8
 delta_r$Temp <- round(delta_std$Temp, digits = 1)
 
-# make standardized dataset (remove s25 column)
+# make standardized dataset (remove s25 column) and write csv.
 delta_std <- delta_r[,c(1,3,4)]
 write_csv(delta_std, "station_files/stations_std/merged_std/delta_e_std.csv")
 
-# MKN and ECD are in celsius and will eventually be merged in
 
 #####################
 ### Sacramento River ####
@@ -832,14 +838,13 @@ SRH_r <- read_csv("station_files/stations_raw/SRH_r.csv")
 SRV_r <- read_csv("station_files/stations_raw/SRV_r.csv")
 SSI_r <- read_csv("station_files/stations_raw/SSI_r.csv")
 SSS_r <- read_csv("station_files/stations_raw/SSS_r.csv")
-SUS_r <- read_csv("station_files/stations_raw/SUS_r.csv") # celsius only
 SUT_r <- read_csv("station_files/stations_raw/SUT_r.csv")
-SWE_r <- read_csv("station_files/stations_raw/SWE_r.csv") # celsius only
 SXS_r <- read_csv("station_files/stations_raw/SXS_r.csv")
 TMS_r <- read_csv("station_files/stations_raw/TMS_r.csv")
 TSL_r <- read_csv("station_files/stations_raw/TSL_r.csv")
+# SUS and SWE are celsius, will need to be merged in
 
-# Bind stations together
+# Bind stations together and write raw dataset
 sacR_r=rbind(BDL_r, BLL_r, DLC_r, DWS_r, FPT_r, GES_r, GLN_r, GSS_r, HWB_r, LIB_r, LIS_r, 
            MAL_r, MIR_r, NSL_r, RVB_r, RYI_r, SDI_r,
            SOI_r, SRH_r, SRV_r, SSI_r, SSS_r, SUT_r, SXS_r, TMS_r, TSL_r)
@@ -850,12 +855,10 @@ sacR_r$s25 <- as.numeric(sacR_r$s25)
 sacR_r$Temp=((sacR_r$s25)-32)/1.8
 sacR_r$Temp <- round(sacR_std$Temp, digits = 1)
 
-# write csv for Sac River stations (sacR0)
+# write csv for Sac River stations
 sacR_std <- sacR_r[,c(1,3,4)]
 write_csv(sacR_std, "station_files/stations_std/merged_std/sacR_e_std.csv")
 
-
-#SUS, SWE are in here but celsius, need to eventually merge in
 
 #######################
 ### San Joaquin River ####
@@ -902,7 +905,9 @@ TWA_r <- read_csv("station_files/stations_raw/TWA_r.csv")
 TWI_r <- read_csv("station_files/stations_raw/TWI_r.csv")
 WCI_r <- read_csv("station_files/stations_raw/WCI_r.csv")
 RIP_r <- read_csv("station_files/stations_raw/RIP_r.csv") # Stanislaus River
+#VNS, SR3, DAR are in celsius, need to eventually merge these in.
 
+# Combine files, write csv for sanJR stations
 sanJR_r <- rbind(ANH_r, BDT_r, BIR_r, DSJ_r, DGL_r, FCT_r, GCT_r, GLC_r, GLE_r, 
           HLT_r, HOL_r, LPS_r, MAB_r, MHR_r, MRU_r, MRX_r, MSD_r, MTB_r, MUP_r, 
           OAD_r, OBD_r, OH1_r, ORI_r, ORM_r, ORQ_r, ORX_r, PDC_r, PRI_r, 
@@ -915,11 +920,11 @@ sanJR_r$s25 <- as.numeric(sanJR_r$s25)
 sanJR_r$Temp <- ((sanJR_r$s25)-32)/1.8
 sanJR_r$Temp <- round(sanJR_r$Temp, digits = 1)
 
-# write file
+# write file for standardized data
 sanJR_std <- sanJR_r[,c(1,3,4)]
 write_csv(sanJR_std, "station_files/stations_std/merged_std/sanJR_e_std.csv")
 
-#VNS, SR3, DAR are in celsius, need to eventually merge these in. 
+ 
 
 ```
 
@@ -940,6 +945,7 @@ celsius_std <- read_csv("station_files/stations_std/merged_std/celsius_e_std.csv
 
 * Write celsius files to global environment
 * Incorporate celsius files into appropriate standardized datasets (delta_std, sacR_std, sanJR_std)
+
 ```{r merge celsiusStdF, message = FALSE}
 ####################
 ### Write celsius files to global environment
@@ -949,7 +955,7 @@ for (name in levels(celsius_std$station)) {
   fn=assign(paste0(name,"_std"),temp, envir = globalenv())
 }
 
-# Incorporate celsius files into new standardized datasets
+# Incorporate celsius files into standardized datasets
 delta_std_f <- rbind(delta_std, ECD_std, MKN_std)
 delta_std_f$region <- "delta"
 
@@ -965,7 +971,7 @@ sanJR_std_f$region <- "sanJR"
 # Combine files
 allsta_std_f <- rbind(delta_std_f, sacR_std_f, sanJR_std_f)
 
-# write large files 
+# write files 
 write_csv(sanJR_std_f, "station_files/stations_std/merged_std/sanJR_std_f.csv")
 write_csv(sacR_std_f, "station_files/stations_std/merged_std/sacR_std_f.csv")
 write_csv(delta_std_f, "station_files/stations_std/merged_std/delta_std_f.csv")
@@ -1292,11 +1298,14 @@ VER_h_r <- read_csv("station_files/stations_raw/hourly/VER_h_r.csv")
 VIC_h_r <- read_csv("station_files/stations_raw/hourly/VIC_h_r.csv")
 VOL_h_r <- read_csv("station_files/stations_raw/hourly/VOL_h_r.csv") 
 
+# Combine all fahrenheit files
 hour_F <- rbind(ANC_h_r, ANH_h_r, BDL_h_r, BKS_F_h_r, BLL_h_r, CCS_h_r, CLL_h_r, CNT_h_r, 
                 CPP_F_h_r, DMC_h_r, DV7_F_h_r, EMM_h_r, FRP_h_r, GLN_h_r, HBP_F_h_r,
                 HLL_h_r, IBS_h_r, JER_h_r, KA0_h_r, MAL_h_r, MSD_h_r, MRZ_h_r, MTB_h_r, 
                 NSL_h_r, PCT_h_r, PTS_h_r, RIV_h_r,ROR_h_r, RPN_h_r, RVB_h_r, SAL_h_r, 
                 SBC_h_r, SJL_h_r, SRH_h_r, STI_h_r, UNI_h_r, VER_h_r, VIC_h_r, VOL_h_r)
+
+# Standardize to Celsius
 hour_F$s25 <- as.numeric(hour_F$s25)
 hour_F$Temp <- ((hour_F$s25)-32)/1.8
 hour_F$Temp <- round(hour_F$Temp, digits = 1)
@@ -1310,14 +1319,15 @@ DV7_C_h_r <- read_csv("station_files/stations_raw/hourly/DV7_C_h_r.csv")
 DYR_C_h_r <- read_csv("station_files/stations_raw/hourly/DYR_h_r.csv")
 HBP_C_h_r <- read_csv("station_files/stations_raw/hourly/HBP_C_h_r.csv") # will need to add
 
+# Standardize "Temp" column name
 hour_C <- rbind(BKS_C_h_r, CLC_C_h_r, CPP_C_h_r, DV7_C_h_r, DYR_C_h_r, HBP_C_h_r)
 names(hour_C)[2] <- "Temp"
 
-# Combine F and C files into one
+# Combine F and C files into one data frame.
 hour_std <- rbind(hour_C, hour_F_convert)
 
+# Load station files to global environment. 
 hour_std$station <- as.factor(hour_std$station) # need to factorize the "stations"
-
 # Write to the global environment
 for (name in levels(hour_std$station)) {
   temp=subset(hour_std, station==name)
@@ -1338,6 +1348,7 @@ sacR_h_std$region <- "sacR"
 sanJR_h_std <- rbind(ANH_h_std, MSD_h_std, MTB_h_std, SJL_h_std, VER_h_std, RPN_h_std ,SBC_h_std)
 sanJR_h_std$region <- "sanJR"
 
+# Merge into all stations and write csv.
 allsta_h_std <- rbind(delta_h_std, sacR_h_std, sanJR_h_std)
 write_csv(allsta_h_std, "station_files/stations_std/merged_std/hourly_std.csv")
 
@@ -1369,7 +1380,7 @@ for (name in levels(allsta_h_std$station)) {
 
 ```
 
-## Combining hourly and event:
+## Combining hourly and event data for particular stations:
 
 * Read event data (std_f) to global environment.
 * Read hourly data (_h_std) to global environment.
@@ -1410,7 +1421,6 @@ write_csv(GLN_m_std,"station_files/stations_std/GLN_m_std.csv")
 
 ## Merge and write regional datasets.These contain hourly and event data. 
 
-
 ```{r merge single, message = FALSE}
 delta_std_single <- rbind(ANC_h_std, BAC_std_f, BET_std_f, BKS_h_std, BLP_std_f, CCS_h_std, CLC_h_std, CLL_h_std,
                           CNT_h_std, CPP_h_std, CSE_std_f, CYG_std_f, DMC_h_std, DV7_h_std, DYR_h_std,
@@ -1448,11 +1458,13 @@ write_csv(allsta_std_single, "station_files/stations_sin/merged/allsta_std_sin.c
 
 ```{r individual single files, message = FALSE}
 library(readr)
+
 allsta <- allsta_std_single # If continuing from above
+
 # If loading file
 # allsta <-  read_csv("station_files/stations_sin/merged/allsta_std_sin.csv")
-allsta$station <- as.factor(allsta$station) # need to factorize the "stations"
 
+allsta$station <- as.factor(allsta$station) # need to factorize the "stations"
 #Get the list of unique MP names
 for (name in levels(allsta$station)) {
   #Subset the data station
