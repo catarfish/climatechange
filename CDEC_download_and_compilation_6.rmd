@@ -1350,7 +1350,7 @@ sanJR_h_std$region <- "sanJR"
 
 # Merge into all stations and write csv.
 allsta_h_std <- rbind(delta_h_std, sacR_h_std, sanJR_h_std)
-write_csv(allsta_h_std, "station_files/stations_std/merged_std/hourly_std.csv")
+write_csv(allsta_h_std, "station_files/stations_std/merged_std/allsta_h_std.csv")
 
 ```
 
@@ -1375,7 +1375,7 @@ for (name in levels(allsta_h_std$station)) {
 }
 
 # For writing one station:
-# MRZ_h_std <- hour_std %>% filter(station == "MRZ")
+# MRZ_h_std <- allsta_h_std %>% filter(station == "MRZ")
 # write_csv(MRZ_h_std, "station_files/stations_std/hourly/MRZ_h_std.csv")
 
 ```
