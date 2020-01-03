@@ -23,7 +23,7 @@ library(readr)
 library(lubridate)
 library(dplyr)
 
-setwd("P:/ClimateChange/R_code/")
+setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/")
 #### Read files ####
 delta_std_0 <- read_csv("station_files/stations_sin/merged/delta_std_sin.csv")
 sacR_std_0 <- read_csv("station_files/stations_sin/merged/sacR_std_sin.csv")
@@ -182,40 +182,40 @@ rm(delta_q1_a, sacR_q1_a, sanJR_q1_a)
 ## QA2) Remove if there are more than 9 repeating values in a row
 
 1. Create new columns indicating whether the temperature at x hour is the same as that of x-1 hours, x-2 hours, x-3 hours, x-4 hours. (1 = yes, 0 = no)
-2. Add the columns up. If all values are the same, "delete" = 4. 
+2. Add the columns up. If all values are the same, "delete"  = 4. 
 3. Filter out rows to be deleted. 
 4. Use antijoin to extract dates that are not in the "delete" data frame. 
-    + Note: the "delete" data frame has only the rows where delete = 4, but we want to delete the entire day if there are     repeating values, so we need to specify by = station, date. 
+    + Note: the "delete" data frame has only the rows where delete = 4, but we want to delete the entire day if there are repeating values, so we need to specify by = station, date. 
 
 ```{r repeating values, message = FALSE}
-library(dplyr)
 
-### delta
+# Function to determine whether values are repeating by each station
+# Inputs are data frame and x (number of repeating values you want to check for)
+repeating_values <- function(df, x) {
+  df %>% 
+    group_by(station) %>%
+    arrange(station, date, hour)
+  for (i in 1:x) {
+    print(i)
+    same <- paste0('same', i)
+    df[[same]]<- ifelse(df$Temp == lag(df$Temp, n = i), 1, 0)
+  }
+  return(df)
+    }
+
+### delta --------------------------------------------------
 delta_q1$Temp <- as.numeric(delta_q1$Temp)
 
-# create columns that are temp-1, temp-2, temp-3, temp-4 (position-1, not actual temperature-1)
-# for columns where there are 12 values repeating in a row (in one day), new variable "delete" = 1
-delta_q2_a <- delta_q1 %>%
-  group_by(station, date) %>%
-  arrange(station, date, hour) %>%
-  mutate(same1 = ifelse(Temp == lag(Temp, n= 1), 1, 0),
-        same2 = ifelse(Temp == lag(Temp, n= 2), 1, 0),
-        same3 = ifelse(Temp == lag(Temp, n= 3), 1, 0),
-        same4 = ifelse(Temp == lag(Temp, n= 4), 1, 0),
-        same5 = ifelse(Temp == lag(Temp, n=5), 1, 0),
-        same6 = ifelse(Temp == lag(Temp, n= 6), 1, 0),
-        same7 = ifelse(Temp == lag(Temp, n= 7), 1, 0),
-        same8 = ifelse(Temp == lag(Temp, n= 8), 1, 0),
-        same9 = ifelse(Temp == lag(Temp, n=9), 1, 0),
-        same10 = ifelse(Temp == lag(Temp, n=10), 1, 0),
-        same11 = ifelse(Temp == lag(Temp, n=11), 1, 0),
-        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + 
-                          same7 + same8 + same9 + same10 + same11 ==11, 1, 0)) %>%
-    ungroup()
+# Run function repeating values. 
+# Tally up "same" columns (same_total)
+# Create column "delete" - if same_total = x (represented by max(same_total), delete = Y)
+delta_q2_a <- repeating_values(df = delta_q1, x = 12) %>% 
+  mutate(same_total = as.numeric(rowSums(select(., contains("same"))))) %>%
+  mutate(delete = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N"))
 
-# create a dataframe of all the "delete" rows
+# Create a dataframe of all the "delete" rows
 delta_q2_b <- delta_q2_a %>%
-  filter(delete == 1)
+  filter(delete == "Y")
 
 # Join original dataframe with "delete" dataframe based on values NOT in common. 
 # based on station and date
@@ -223,32 +223,19 @@ delta_q2_b <- delta_q2_a %>%
 delta_q2 <- delta_q1 %>%
   anti_join(delta_q2_b,by = c("station", "date"))
 
-### sacR
+### sacR -----------------------------------------------------
 sacR_q1$Temp <- as.numeric(sacR_q1$Temp)
 
-# create columns that are temp-1, temp-2, temp-3, temp-4 (position-1, not actual temperature-1)
-# for columns where there are 12 values repeating in a row (in one day), new variable "delete" = 1
-sacR_q2_a <- sacR_q1 %>%
-  group_by(station, date) %>%
-  arrange(station, date, hour) %>%
-  mutate(same1 = ifelse(Temp == lag(Temp, n= 1), 1, 0),
-        same2 = ifelse(Temp == lag(Temp, n= 2), 1, 0),
-        same3 = ifelse(Temp == lag(Temp, n= 3), 1, 0),
-        same4 = ifelse(Temp == lag(Temp, n= 4), 1, 0),
-        same5 = ifelse(Temp == lag(Temp, n=5), 1, 0),
-        same6 = ifelse(Temp == lag(Temp, n= 6), 1, 0),
-        same7 = ifelse(Temp == lag(Temp, n= 7), 1, 0),
-        same8 = ifelse(Temp == lag(Temp, n= 8), 1, 0),
-        same9 = ifelse(Temp == lag(Temp, n=9), 1, 0),
-                same10 = ifelse(Temp == lag(Temp, n=10), 1, 0),
-        same11 = ifelse(Temp == lag(Temp, n=11), 1, 0),
-        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + 
-                          same7 + same8 + same9 + same10 + same11 ==11, 1, 0)) %>%
-  ungroup()
+# Run function repeating values. 
+# Tally up "same" columns (same_total)
+# Create column "delete" - if same_total = x (represented by max(same_total), delete = Y)
+sacR_q2_a <- repeating_values(df = sacR_q1, x = 12) %>% 
+  mutate(same_total = as.numeric(rowSums(select(., contains("same"))))) %>%
+  mutate(delete = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N"))
 
 # create a dataframe of all the "delete" rows
 sacR_q2_b <- sacR_q2_a %>%
-  filter(delete == 1)
+  filter(delete == "Y")
 
 # Join original dataframe with "delete" dataframe based on values NOT in common. 
 # based on station and date
@@ -256,32 +243,19 @@ sacR_q2_b <- sacR_q2_a %>%
 sacR_q2 <- sacR_q1 %>%
   anti_join(sacR_q2_b,by = c("station", "date"))
 
-### sanJR
+### sanJR -----------------------------------------------------
 sanJR_q1$Temp <- as.numeric(sanJR_q1$Temp)
 
-# create columns that are temp-1, temp-2, temp-3, temp-4 (position-1, not actual temperature-1)
-# for columns where there are 12 values repeating in a row (in one day), new variable "delete" = 1
-sanJR_q2_a <- sanJR_q1 %>%
-  group_by(station, date) %>%
-  arrange(station, date, hour) %>%
-  mutate(same1 = ifelse(Temp == lag(Temp, n= 1), 1, 0),
-        same2 = ifelse(Temp == lag(Temp, n= 2), 1, 0),
-        same3 = ifelse(Temp == lag(Temp, n= 3), 1, 0),
-        same4 = ifelse(Temp == lag(Temp, n= 4), 1, 0),
-        same5 = ifelse(Temp == lag(Temp, n=5), 1, 0),
-        same6 = ifelse(Temp == lag(Temp, n= 6), 1, 0),
-        same7 = ifelse(Temp == lag(Temp, n= 7), 1, 0),
-        same8 = ifelse(Temp == lag(Temp, n= 8), 1, 0),
-        same9 = ifelse(Temp == lag(Temp, n=9), 1, 0),
-        same10 = ifelse(Temp == lag(Temp, n=10), 1, 0),
-        same11 = ifelse(Temp == lag(Temp, n=11), 1, 0),
-        delete = ifelse(same1 + same2 + same3 + same4 + same5 + same6 + 
-                          same7 + same8 + same9 + same10 + same11 ==11, 1, 0)) %>%
-  ungroup()
+# Run function repeating values. 
+# Tally up "same" columns (same_total)
+# Create column "delete" - if same_total = x (represented by max(same_total), delete = Y)
+sanJR_q2_a <- repeating_values(df = sanJR_q1, x = 12) %>% 
+  mutate(same_total = as.numeric(rowSums(select(., contains("same"))))) %>%
+  mutate(delete = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N"))
 
 # create a dataframe of all the "delete" rows
 sanJR_q2_b <- sanJR_q2_a %>%
-  filter(delete == 1)
+  filter(delete == "Y")
 
 # Join original dataframe with "delete" dataframe based on values NOT in common. 
 # based on station and date
@@ -293,6 +267,41 @@ sanJR_q2 <- sanJR_q1 %>%
 rm(delta_q2_a, sacR_q2_a, sanJR_q2_a,
    delta_q2_b, sacR_q2_b, sanJR_q2_b)
 ```
+
+### Rate of change and Spike test
+```{r Rate of Change}
+library(TTR)
+library(caTools)
+
+### sacR ---------------------------------------------
+# Q3: Temp - Temp-1
+# sdev_th: Determined threshold for too high of a rate of change (3 * SD(Temp) over 25 days)
+# If Q3 > sdev_th, flag.
+# Additionally, if Q3 > 5 (5 degree change in 15 minutes), flag. 
+
+sacR_q3 <- sacR_q2 %>%
+  group_by(station) %>%
+  arrange(station, datetime) %>%
+  mutate(Q3 = abs(Temp- lag(Temp, n = 1)))%>%
+  mutate(sdev_th = 3 * runSD(Temp, 25))%>%
+  mutate(Flag_Q3 = ifelse((Q3 > sdev_th | Q3 > 5), "Y", "N"))
+
+sacR_q3 %>%
+  filter(Flag_Q3 == "Y")
+
+
+
+
+BDLF <- sacR_q3 %>%
+  filter(station == "BDL") %>%
+  filter(yrMon == "17-10") %>%
+  mutate(sdev = runSD(Temp, 25))
+
+
+sd(BDLF$Temp[7:31])
+
+```
+
 
 
 ## QA3): Remove anything outside of reasonable temperature range (0-40)
@@ -307,6 +316,7 @@ sanJR_q3 <- sanJR_q2%>%
   filter(Temp>0 & Temp<40)
 ```
 
+Outlier removal
 
 ## Q3: Merge and write files up to this point
 
@@ -361,6 +371,21 @@ for (name in levels(allsta_q3$station)) {
   fn=assign(paste0(name,"_q3"),temp, envir = globalenv())
   }
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## QA4): Outlier method 1: Modified Z score method
 
