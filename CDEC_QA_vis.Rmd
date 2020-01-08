@@ -16,9 +16,8 @@ library(readr)
 library(lubridate)
 library(dplyr)
 
-
 # Read in overall files (if needed)
-setwd("P:/ClimateChange/R_code/")
+setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/")
 allsta_q3 <- read_csv("station_files/stations_qa/merged/allsta_q3.csv")
 allsta_q4 <- read_csv("station_files/stations_qa/merged/allsta_q4.csv")
 allsta_q5 <- read_csv("station_files/stations_qa/merged/allsta_q5.csv")
@@ -56,7 +55,7 @@ for (name in levels(allsta_q5$station)) {
 ## Compare pre-outlier testing with post-outlier testing
 ### Pick stations, make one data frame.
 
-```{r plots, message = FALSE, echo = FALSE}
+```{r filter, message = FALSE, echo = FALSE}
 library(dplyr)
 
 # Select some stations to look at QA
@@ -71,12 +70,35 @@ testset_q5 <- allsta_q5 %>% filter(station %in% teststa) %>% subset(select = c(1
 testall <- rbind(testset_q3, testset_q4, testset_q5)
 testall$qa <- as.factor(testall$qa)
 
+testsub <- testall[1:800000,]
+
 
 ```
 
 
-### Make plots 
-```{r plots}
+# Option 1: Make plots in console
+```{r plots console, message = FALSE}
+library(ggplot2)
+library(scales)
+library(data.table)
+
+stationList <- unique(testall$station)
+
+multiPlot <- function(stationList){
+    testall %>%
+    filter(station == stationList) %>%
+    ggplot(aes(datetime, Temp, col = qa, shape = qa),alpha=0.5) + geom_point() +
+    labs(title = stationList) +
+    scale_x_datetime(breaks = "1 year", labels = date_format("%Y"))+
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))}
+
+lapply(stationList, multiPlot)
+
+```
+
+### Option 2: Save plots into folder
+```{r plots, eval = FALSE}
 library(ggplot2)
 library(scales)
 library(data.table)
@@ -103,19 +125,20 @@ plist <- by(testall, testall$station, function(i) {
 lapply(names(plist), 
        function(x) ggsave(filename=paste(x,".png",sep=""), plot=plist[[x]], bg = "transparent"))
 
-
 ```
 
 
 ## Calculate temperature ranges
 ## Make heatmaps
 
-```{r temp ranges, message = FALSE}
+```{r temp ranges, message = FALSE, warning = FALSE}
 
 library(lubridate)
 library(dplyr)
 library(tidyr)
 library(RColorBrewer)
+library(readr)
+library(ggplot2)
 
 Trange_q4 <- allsta_q4 %>%
   group_by(region, station, year) %>%
@@ -155,7 +178,7 @@ ggplot(latlon_q4) +
 
 ### delta 
 
-delta <- latlon %>% filter(region == "delta")
+delta <- latlon_q4 %>% filter(region == "delta")
 delta$year <- as.factor(delta$year)
 delta$range <- as.numeric(delta$range)
 delta$Tmax <- as.numeric(delta$Tmax)
@@ -183,7 +206,7 @@ deltaT_matrix <- data.matrix(deltaT.m)
 heatmap(deltaT_matrix, Rowv = NA, Colv = NA, col = brewer.pal(10, "YlOrRd"), scale = "column")
 
 ### sacR
-sacR <- latlon %>% filter(region == "sacR")
+sacR <- latlon_q4 %>% filter(region == "sacR")
 sacR$year <- as.factor(sacR$year)
 sacR$range <- as.numeric(sacR$range)
 sacR$Tmax <- as.numeric(sacR$Tmax)
@@ -196,7 +219,7 @@ row.names(sacRR.m) <- sacRR.m$station
 sacRR.m <- sacRR.m[,3:34]
 sacRR_matrix <- data.matrix(sacRR.m)
 
-heatmap(sacRR_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlGnBu"), scale = "row")
+heatmap(sacRR_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlGnBu"), scale = "column")
 
 # map for max temperatures 
 sacRT <- sacR[,c(1,6,8,10)]
@@ -210,7 +233,7 @@ sacRT_matrix <- data.matrix(sacRT.m)
 heatmap(sacRT_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlOrRd"), scale = "row")
 
 ### sanJR
-sanJR <- latlon %>% filter(region == "sanJR")
+sanJR <- latlon_q4 %>% filter(region == "sanJR")
 sanJR$year <- as.factor(sanJR$year)
 sanJR$range <- as.numeric(sanJR$range)
 sanJR$Tmax <- as.numeric(sanJR$Tmax)
@@ -234,7 +257,7 @@ row.names(sanJRT.m) <- sanJRT.m$station
 sanJRT.m <- sanJRT.m[,3:22]
 sanJRT_matrix <- data.matrix(sanJRT.m)
 
-heatmap(sanJRT_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlOrRd"), scale = "column")
+heatmap(sanJRT_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlOrRd"), scale = "row")
 
 ```
 

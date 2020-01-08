@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ---
 title: "CDEC_QA"
 author: "Catarina Pien"
@@ -35,6 +36,7 @@ check <- delta_std_0 %>% filter(station == "DAR")
 # Filter out stations that are not contiguous.
 delta_std <- delta_std_0 %>% 
   filter(!station %in% c("CNT", "CPP", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY"))
+
 
 sacR_std <- sacR_std_0
 
@@ -211,11 +213,11 @@ delta_q1$Temp <- as.numeric(delta_q1$Temp)
 # Create column "delete" - if same_total = x (represented by max(same_total), delete = Y)
 delta_q2_a <- repeating_values(df = delta_q1, x = 12) %>% 
   mutate(same_total = as.numeric(rowSums(select(., contains("same"))))) %>%
-  mutate(delete = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N"))
+  mutate(Flag_Q2 = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N"))
 
 # Create a dataframe of all the "delete" rows
 delta_q2_b <- delta_q2_a %>%
-  filter(delete == "Y")
+  filter(Flag_Q2 == "Y")
 
 # Join original dataframe with "delete" dataframe based on values NOT in common. 
 # based on station and date
@@ -231,11 +233,11 @@ sacR_q1$Temp <- as.numeric(sacR_q1$Temp)
 # Create column "delete" - if same_total = x (represented by max(same_total), delete = Y)
 sacR_q2_a <- repeating_values(df = sacR_q1, x = 12) %>% 
   mutate(same_total = as.numeric(rowSums(select(., contains("same"))))) %>%
-  mutate(delete = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N"))
+  mutate(Flag_Q2 = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N"))
 
 # create a dataframe of all the "delete" rows
 sacR_q2_b <- sacR_q2_a %>%
-  filter(delete == "Y")
+  filter(Glag_Q2 == "Y")
 
 # Join original dataframe with "delete" dataframe based on values NOT in common. 
 # based on station and date
@@ -251,11 +253,11 @@ sanJR_q1$Temp <- as.numeric(sanJR_q1$Temp)
 # Create column "delete" - if same_total = x (represented by max(same_total), delete = Y)
 sanJR_q2_a <- repeating_values(df = sanJR_q1, x = 12) %>% 
   mutate(same_total = as.numeric(rowSums(select(., contains("same"))))) %>%
-  mutate(delete = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N"))
+  mutate(Flag_Q2 = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N"))
 
 # create a dataframe of all the "delete" rows
 sanJR_q2_b <- sanJR_q2_a %>%
-  filter(delete == "Y")
+  filter(Flag_Q2 == "Y")
 
 # Join original dataframe with "delete" dataframe based on values NOT in common. 
 # based on station and date
@@ -268,7 +270,7 @@ rm(delta_q2_a, sacR_q2_a, sanJR_q2_a,
    delta_q2_b, sacR_q2_b, sanJR_q2_b)
 ```
 
-### Rate of change and Spike test
+### QA3: Rate of change and Spike test
 ```{r Rate of Change}
 library(TTR)
 library(caTools)
@@ -279,112 +281,91 @@ library(caTools)
 # If Q3 > sdev_th, flag.
 # Additionally, if Q3 > 5 (5 degree change in 15 minutes), flag. 
 
-sacR_q3 <- sacR_q2 %>%
+sacR_q3_a <- sacR_q2 %>%
   group_by(station) %>%
   arrange(station, datetime) %>%
   mutate(Q3 = abs(Temp- lag(Temp, n = 1)))%>%
   mutate(sdev_th = 3 * runSD(Temp, 25))%>%
   mutate(Flag_Q3 = ifelse((Q3 > sdev_th | Q3 > 5), "Y", "N"))
 
-sacR_q3 %>%
+sacR_q3_b <- sacR_q3_a %>%
   filter(Flag_Q3 == "Y")
 
+sacR_q3 <- sacR_q2 %>%
+  anti_join(sacR_q3_b, by = c("station", "date"))
 
-
-
-BDLF <- sacR_q3 %>%
-  filter(station == "BDL") %>%
-  filter(yrMon == "17-10") %>%
-  mutate(sdev = runSD(Temp, 25))
-
-
-sd(BDLF$Temp[7:31])
 
 ```
 
 
 
-## QA3): Remove anything outside of reasonable temperature range (0-40)
+## QA4): Remove anything outside of reasonable temperature range (0-40)
 ```{r 0-40, message = FALSE}
-delta_q3 <- delta_q2%>%
+delta_q4 <- delta_q3%>%
   filter(Temp>0 & Temp<40)
 
-sacR_q3 <- sacR_q2%>%
+sacR_q4 <- sacR_q3%>%
   filter(Temp>0 & Temp<40)
 
-sanJR_q3 <- sanJR_q2%>%
+sanJR_q4 <- sanJR_q3%>%
   filter(Temp>0 & Temp<40)
 ```
 
 Outlier removal
 
-## Q3: Merge and write files up to this point
+## Q4: Merge and write files up to this point
 
-* One large file with all stations: **allsta_q3**
-* Individual files for each station: **STA_q3**
+* One large file with all stations: **allsta_q4**
+* Individual files for each station: **STA_q4**
 
 ```{r q3 merge, message = FALSE, eval = FALSE}
 
-allsta_q3 <- rbind(delta_q3, sacR_q3, sanJR_q3)
+allsta_q4 <- rbind(delta_q4, sacR_q4, sanJR_q4)
 
-allsta_q3$qa <- "q3"
-delta_q3$qa <- "q3"
-sanJR_q3$qa <- "q3"
-sacR_q3$qa <- "q3"
+allsta_q3$qa <- "q4"
+delta_q3$qa <- "q4"
+sanJR_q3$qa <- "q4"
+sacR_q3$qa <- "q4"
 
 # Write large files
-write_csv(delta_q3, "station_files/stations_qa/merged/delta_q3.csv")
-write_csv(sacR_q3, "station_files/stations_qa/merged/sacR_q3.csv")
-write_csv(sanJR_q3, "station_files/stations_qa/merged/sanJR_q3.csv")
-write_csv(allsta_q3, "station_files/stations_qa/merged/allsta_q3.csv")
+write_csv(delta_q4, "station_files/stations_qa/merged/delta_q4.csv")
+write_csv(sacR_q4, "station_files/stations_qa/merged/sacR_q4.csv")
+write_csv(sanJR_q4, "station_files/stations_qa/merged/sanJR_q4.csv")
+write_csv(allsta_q4, "station_files/stations_qa/merged/allsta_q4.csv")
 
 ### Write individual files
 # If loading file
 # allsta_q3 <-  read_csv("station_files/stations_qa/merged/allsta_q3.csv")
 
-allsta_q3$station <- as.factor(allsta_q3$station) # need to factorize the "stations"
+allsta_q4$station <- as.factor(allsta_q4$station) # need to factorize the "stations"
 
 #Get the list of unique MP names
 for (name in levels(allsta_q3$station)) {
   #Subset the data station
-  tmp=subset(allsta_q3,station==name)
+  tmp=subset(allsta_q4,station==name)
   #Create a new filename for each station. Designate the folder you want the files in.
-  fn=paste('station_files/stations_qa/preoutlier/',name, "_q3.csv", sep="")
+  fn=paste('station_files/stations_qa/preoutlier/',name, "_q4.csv", sep="")
   #Save the CSV file for each station
   write_csv(tmp,fn)
 }
 ```
 
-## Write q3 to global environment
+## Write q4 to global environment
 ```{r q3 global, message = FALSE, eval = FALSE}
 
-allsta_q3 <- read_csv("station_files/stations_qa/merged/allsta_q3.csv")
+allsta_q4 <- read_csv("station_files/stations_qa/merged/allsta_q4.csv")
 
 ### Write individual files to global environment
 # If loading file
-# allsta_q3 <-  read_csv("station_files/stations_qa/merged/allsta_q3.csv")
+# allsta_q4 <-  read_csv("station_files/stations_qa/merged/allsta_q4.csv")
 
-allsta_q3$station <- as.factor(allsta_q3$station) # need to factorize the "stations"
+allsta_q4$station <- as.factor(allsta_q4$station) # need to factorize the "stations"
 
-for (name in levels(allsta_q3$station)) {
-  temp=subset(allsta_q3, station==name)
-  fn=assign(paste0(name,"_q3"),temp, envir = globalenv())
+for (name in levels(allsta_q4$station)) {
+  temp=subset(allsta_q4, station==name)
+  fn=assign(paste0(name,"_q4"),temp, envir = globalenv())
   }
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ## QA4): Outlier method 1: Modified Z score method
@@ -642,4 +623,3 @@ for (name in levels(allsta_q5$station)) {
 
 
 ```
-
