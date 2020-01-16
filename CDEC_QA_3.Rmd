@@ -1,3 +1,8 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
 <<<<<<< HEAD
 ---
 title: "CDEC_QA"
@@ -36,7 +41,6 @@ check <- delta_std_0 %>% filter(station == "DAR")
 # Filter out stations that are not contiguous.
 delta_std <- delta_std_0 %>% 
   filter(!station %in% c("CNT", "CPP", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY"))
-
 
 sacR_std <- sacR_std_0
 
@@ -181,7 +185,7 @@ rm(delta_q1_a, sacR_q1_a, sanJR_q1_a)
 ```
 
 
-## QA2) Remove if there are more than 9 repeating values in a row
+## QA2) Remove if there are more than 12 repeating values in a row
 
 1. Create new columns indicating whether the temperature at x hour is the same as that of x-1 hours, x-2 hours, x-3 hours, x-4 hours. (1 = yes, 0 = no)
 2. Add the columns up. If all values are the same, "delete"  = 4. 
@@ -237,7 +241,7 @@ sacR_q2_a <- repeating_values(df = sacR_q1, x = 12) %>%
 
 # create a dataframe of all the "delete" rows
 sacR_q2_b <- sacR_q2_a %>%
-  filter(Glag_Q2 == "Y")
+  filter(Flag_Q2 == "Y")
 
 # Join original dataframe with "delete" dataframe based on values NOT in common. 
 # based on station and date
@@ -309,7 +313,38 @@ sacR_q4 <- sacR_q3%>%
 
 sanJR_q4 <- sanJR_q3%>%
   filter(Temp>0 & Temp<40)
+############TEMPORARY ONLY##########
+
+delta_q4 <- delta_q2%>%
+  filter(Temp>0 & Temp<40)
+
+sacR_q4 <- sacR_q2%>%
+  filter(Temp>0 & Temp<40)
+
+sanJR_q4 <- sanJR_q2%>%
+  filter(Temp>0 & Temp<40)
 ```
+
+
+
+
+
+```{r}
+Tdiffs <- delta_q4 %>%
+  group_by(station, date)%>%
+  arrange(datetime)%>%
+  mutate(Tdiff = Temp - lag(Temp, 1))
+
+ggplot(Tdiffs) +
+  geom_boxplot(aes(x = station, y =Tdiff))
+
+
+ggplot(Tdiffs) +
+  geom_point(aes(x = datetime, y =Tdiff), colour = )
+```
+
+
+
 
 Outlier removal
 
