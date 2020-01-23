@@ -25,6 +25,7 @@ library(tidyverse)
 library(data.table) #rbindlist()
 library(lubridate) #today()
 library(CDECRetrieve)#cdec_datasets
+library(readr)
 
 # To get CDEC Retrieve initially:  
 # install roxygen2 (normal install method)
@@ -35,32 +36,32 @@ library(CDECRetrieve)#cdec_datasets
 ```
 
 
-Download information about what data are collected by stations
+Download information about what data are collected by stations (different sensors)
 Filter out which stations collect event/hourly temperature data
 
 ```{r Station sensors, message = FALSE}
 
-# All Event (E) stations
+# List of all stations
 sta_all<-c("BAC", "BET", "BLP", "CSE", "CYG", "FAL", "FLT", "FRK",
           "GOD", "GYS", "GZB", "GZL", "HON", "HUN", "IBS", "MDM", "MHO", "MOK", "MRZ", "MSL",
           "NMR", "OBI", "ODM", "OH4", "OLD", "OSJ", "PCO", "PPT", "ROR", "RSL", "RYC",
           "SMR", "SNC", "SUR", "TEA", "VCU", "VOL", 
           "BDL", "BLL", "DLC", "DWS", "FPT", "GES", "GLN", "GSS", "HWB", "LIB", "LIS", "MAL",
-          "MIR", "NSL", "RVB", "RYI", "SDI", "SOI", "SRH", "SRV", "SSI", "SSS", "SUT", "SXS",
-          "TMS", "TSL",
+          "MIR", "NSL", "RVB", "RYI", "SDI", "SOI", "SRH", "SRV", "SSI", "SSS", "SUT", "SXS","TMS", "TSL",
           "ANH", "BDT", "BIR", "DGL", "DSJ", "FCT", "GCT", "GLC", "GLE", "HLT", "HOL", "LPS",
           "MAB", "MHR", "MRU", "MRX", "MSD", "MTB", "MUP", "OAD", "OBD", "OH1", "ORI", "ORM", 
-          "ORQ", "ORX", "PDC", "PRI", "RRI", "SGA", "SJC", "SJD", "SJG", "SJJ", "SJL", "TPI",
-          "TRN", "TWA", "TWI", "WCI", "RIP",
+          "ORQ", "ORX", "PDC", "PRI", "RRI", "SGA", "SJC", "SJD", "SJG", "SJJ", "SJL", "SJR", 
+          "TPI", "TPS", "TRN", "TWA", "TWI", "WCI", "RIP",
           "DAR", "ECD", "MKN", "SR3", "SUS", "SWE", "VNS", "SJR",
           "ANC", "BKS", "CCS", "CLL", "CNT", "CPP", "DMC", "EMM", "FRP", "HBP", "HLL",
-          "OBS", "JER", "KA0", "PCT", "PTS", "RIV", "ROR", "SAL", "STI", "UNI", "VIC", "VOL", "MRZ",
-          "ANH", "BDL", "BLL", "DV7", "GLN", "MAL", "MSD", "MTB", "NSL", "VER", "RPN", "RVB", "SBC", "SJL", "SRH",
+          "OBI", "JER", "KA0", "PCT", "PTS", "RIV", "ROR", "SAL", "STI", "UNI", "VIC", "VOL", "MRZ",
+          "ANH", "BDL", "BLL", "DV7", "GLN", "MAL", "MSD", "MTB", "NSL", "VER", "RPN", "RVB", "SJL", "SRH",
           "BKS", "CLC", "CPP", "DV7", "DYR", "HBP")
+# Filter out list of unique stations (some are in there multiple times)
 sta <- unique(sta_all)
 
 
-# First download dataset info ---------------------------------------------
+### First download dataset info ---------------------------------------------
 
 # Loop to get info on what sensors are available for each station
 # Based on station list above
@@ -74,11 +75,11 @@ for(i in 1:length(sta)){
 # Bind into dataframe 
 cdec_datasets_df <-rbindlist(sensordataset)   #** LIST INTO DATAFRAME **
 
-# Remove unnecessary
+# Remove unnecessary objects
 rm(dataset)
 rm(sensordataset)
 
-# Only stations with event and hourly water temperature data
+# Include only stations with event and hourly water temperature data
 cdec_temp <- cdec_datasets_df %>% 
   filter(sensor_number == 25 | sensor_number == 146) %>% 
   filter(duration !="daily") %>%
@@ -98,37 +99,32 @@ Split up into 4 sets of stations:
 
 ###################################### Event Data - Fahrenheit ##############################
 
-### List of stations ----------------------------------
+### Define list of stations ----------------------------------
 
-# Delta/Mokelumne/East Bay, Event (E), Fahrenheit (25)
+# Delta/Mokelumne/East Bay, sacR, sanJR (these are designations from CDEC) - this is how stations 
+# are ordered below, and is why they are not in alphabetical order
 sta_Ev_F <- c("BAC", "BET", "BLP", "CSE", "CYG", "FAL", "FLT", "FRK",
           "GOD", "GYS", "GZB", "GZL", "HON", "HUN", "IBS", "MDM", "MHO", "MOK", "MRZ", "MSL",
           "NMR", "OBI", "ODM", "OH4", "OLD", "OSJ", "PCO", "PPT", "ROR", "RSL", "RYC",
-          "SMR", "SNC", "SUR", "TEA", "VCU", "VOL")
-
-# SacR, Event (E), Fahrenheit (25)
-staEv2 <- c("BDL", "BLL", "DLC", "DWS", "FPT", "GES", "GLN", "GSS", "HWB", "LIB", "LIS", "MAL",
-            "MIR", "NSL", "RVB", "RYI", "SDI", "SOI", "SRH", "SRV", "SSI", "SSS", "SUT", "SXS",
-            "TMS", "TSL")
-
-# sanJR, Event (E), Fahrenheit (25)
-staEv3 <- c("ANH", "BDT", "BIR", "DGL", "DSJ", "FCT", "GCT", "GLC", "GLE", "HLT", "HOL", "LPS",
-            "MAB", "MHR", "MRU", "MRX", "MSD", "MTB", "MUP", "OAD", "OBD", "OH1", "ORI", "ORM", 
-            "ORQ", "ORX", "PDC", "PRI", "RRI", "SGA", "SJC", "SJD", "SJG", "SJJ", "SJL", "TPI",
-            "TRN", "TWA", "TWI", "WCI", "RIP")
-
+          "SMR", "SNC", "SUR", "TEA", "VCU", "VOL",
+          "BDL", "BLL", "DLC", "DWS", "FPT", "GES", "GLN", "GSS", "HWB", "LIB", "LIS", "MAL",
+          "MIR", "NSL", "RVB", "RYI", "SDI", "SOI", "SRH", "SRV", "SSI", "SSS", "SUT", "SXS",
+          "TMS", "TSL", "ANH", "BDT", "BIR", "DGL", "DSJ", "FCT", "GCT", "GLC", "GLE", "HLT", "HOL", "LPS",
+          "MAB", "MHR", "MRU", "MRX", "MSD", "MTB", "MUP", "OAD", "OBD", "OH1", "ORI", "ORM", 
+          "ORQ", "ORX", "PDC", "PRI", "RIP", "RRI", "SGA", "SJC", "SJD", "SJG", "SJJ", "SJL", "SJR",
+          "TPI", "TRN", "TWA", "TWI", "WCI", "RIP")
 
 ### Define rest of the sensor information desired -------------
-# same for all datasets in this section
+# Start and end dates - these will remain the same throughout
 start <- "1986-01-01"
 end <- "2019-12-31"
 
-# different for each
+# Sensor number, time interval - these are different for each set of stations
 sensor1 <- "25"
 interval1 <- "E"
 
 ### Download data, bind, write --------------------------------------------
-Temp_Event1_Raw <- lapply(sta_Ev_F, 
+Temp_Event_F_Raw <- lapply(sta_Ev_F, 
                  function(x){
                    cdec_query(station = x,
                               sensor_num = sensor1,
@@ -137,19 +133,20 @@ Temp_Event1_Raw <- lapply(sta_Ev_F,
                               end_date = end)
                  })
 
-Temp_Event1_F_Raw_df <- bind_rows(Temp_Event1_Raw) # bind rows into data frame
-write.csv() # write data
-
+Temp_E_F_Raw_df <- bind_rows(Temp_Event_F_Raw) # bind rows into data frame
+write_csv(Temp_E_F_Raw_df, "TempData/Raw/Temp_E_F_raw.csv") #write data
+saveRDS(Temp_E_F_Raw_df, "TempData/Raw/Temp_E_F_raw.rds") #write rds
 
 
 ###################################### Event Data - Celsius ##############################
 
-staEvC <- c("DAR", "ECD", "MKN", "SR3", "SUS", "SWE", "VNS", "SJR")
+### Define stations, sensor, interval ------------------------------------------
+sta_Ev_C <- c("DAR", "ECD", "MKN", "SJR", "SR3", "SUS", "SWE", "VNS")
 sensor2 <- "146"
 interval2 <- "E"
 
 ### Download data, bind, write --------------------------------------------
-Temp_Event_C_Raw <- lapply(staEvC, 
+Temp_Event_C_Raw <- lapply(sta_Ev_C, 
                  function(x){
                    cdec_query(station = x,
                               sensor_num = sensor2,
@@ -158,21 +155,25 @@ Temp_Event_C_Raw <- lapply(staEvC,
                               end_date = end)
                  })
 
-Temp_Event_C_Raw_df <- bind_rows(Temp_Event_C_Raw) # bind into df
+Temp_E_C_Raw_df <- bind_rows(Temp_Event_C_Raw) # bind into df
 
-write.csv(Temp_Event_C_Raw_df, "") #write data
+write_csv(Temp_E_C_Raw_df, "TempData/Raw/Temp_E_C_raw.csv") #write data
+saveRDS(Temp_E_C_Raw_df, "TempData/Raw/Temp_E_C_raw.rds") #write rds
 
 
 ###################################### Hourly Data - Fahrenheit ##############################
 
-staHF <- c("ANC", "BKS", "CCS", "CLL", "CNT", "CPP", "DMC", "EMM", "FRP", "HBP", "HLL",
-          "OBS", "JER", "KA0", "PCT", "PTS", "RIV", "ROR", "SAL", "STI", "UNI", "VIC", "VOL", "MRZ",
-          "ANH", "BDL", "BLL", "DV7", "GLN", "MAL", "MSD", "MTB", "NSL", "VER", "RPN", "RVB", "SBC", "SJL", "SRH")
+### Define stations, sensor, interval ------------------------------------------
+sta_H_F <- c("ANC", "ANH", "BAC", "BDL", "BLL", "CCS", "CLL", "CNT", "CPP", "DLC", "DMC", "DV7",
+             "EMM", "FRP", "GLC", "GLN", "GOD", "GYS", "HBP", "HLL", "HLT", "HUN", "IBS", 
+             "JER", "KA0", "MAL", "MDM", "MRZ", "MSD", "MSL", "MTB", "NSL", 
+             "OBI", "OH1", "OH4", "OSJ", "PCT", "PPT", "PTS", "RIV", "ROR", "RPN", "RVB", 
+             "SAL", "SJL", "SJR", "SNC", "SRH", "STI", "UNI", "VER", "VIC", "VOL")
 sensor3 <- "25"
 interval3 <- "H"
 
 ### Download data, bind, write --------------------------------------------
-Temp_Hourly_F_Raw <- lapply(staHF, 
+Temp_Hourly_F_Raw <- lapply(sta_H_F, 
                  function(x){
                    cdec_query(station = x,
                               sensor_num = sensor3,
@@ -181,19 +182,21 @@ Temp_Hourly_F_Raw <- lapply(staHF,
                               end_date = end)
                  })
 
-Temp_Hourly_F_Raw_df <- bind_rows(Temp_Hourly_F_Raw) # bind into df
-write.csv() # write data
+Temp_H_F_Raw_df <- bind_rows(Temp_Hourly_F_Raw) # bind into df
+write_csv(Temp_H_F_Raw_df, "TempData/Raw/Temp_H_F_raw.csv") #write data
+saveRDS(Temp_H_F_Raw_df, "TempData/Raw/Temp_H_F_raw.rds") #write rds
 
 
 ###################################### Hourly Data - Celsius ##############################
 
-staHC <- c("BKS", "CLC", "CPP", "DV7", "DYR", "HBP")
+### Define stations, sensor, interval ------------------------------------------
+sta_H_C <- c("BKS", "CLC", "CPP", "DV7", "DYR", "HBP", "KA0", "SJR")
 sensor4 <- "146"
 interval4 <- "H"
 
 
 ### Download data, bind, write --------------------------------------------
-Temp_Hourly_C_Raw <- lapply(staHC, 
+Temp_Hourly_C_Raw <- lapply(sta_H_C, 
                  function(x){
                    cdec_query(station = x,
                               sensor_num = sensor4,
@@ -202,8 +205,59 @@ Temp_Hourly_C_Raw <- lapply(staHC,
                               end_date = end)
                  })
 
-Temp_Hourly_C_Raw_df <- bind_rows(Temp_Hourly_C_Raw) # bind into df
-write.csv() # write data
+Temp_H_C_Raw_df <- bind_rows(Temp_Hourly_C_Raw) # bind into df
+write_csv(Temp_H_C_Raw_df, "TempData/Raw/Temp_H_C_raw.csv") #write data
+saveRDS(Temp_H_C_Raw_df, "TempData/Raw/Temp_H_C_raw.rds") #write rds
 
+# Remove some files
+rm(Temp_Event_F_Raw, Temp_Event_C_Raw, Temp_Hourly_C_Raw, Temp_Hourly_F_Raw)
+```
+
+
+Standardize data to Celsius
+Merge data into one dataset
+Write file of merged data
+
+```{r Standardize data, message = FALSE}
+
+# Merge Fahrenheit event and hourly data together | Add column Temp (converts F to C) | Rm and rename columns
+Temp_F <- rbind(Temp_E_F_Raw_df, Temp_H_F_Raw_df)
+Temp_FtoC <- Temp_F %>% mutate(Temp = round((parameter_value-32)/1.8,1))
+Temp_C_1 <- Temp_FtoC %>% 
+  select(-c(agency_cd, parameter_cd, parameter_value)) %>%
+  rename(station = location_id)
+
+# Merge Celsius event and hourly data together | Rm and rename columns
+Temp_C <- rbind(Temp_E_C_Raw_df, Temp_H_C_Raw_df)
+Temp_C_2 <- Temp_C %>% 
+  select(-c(agency_cd, parameter_cd)) %>% 
+  rename(station = location_id,
+         Temp = parameter_value)
+
+# Remove some files
+rm(Temp_F, Temp_FtoC, Temp_C)
+
+# Merge converted temp data frames together 
+Temp_all_std <- rbind(Temp_C_1, Temp_C_2)
+saveRDS(Temp_all_std, "TempData/Std/Temp_C_all_std.rds") # Write rds
+write_csv(Temp_all_std, "Tempdata/std/Temp_C_all_std.csv") # write csv
+
+
+```
+
+
+Write individual files for each station
+
+```{r Individual station files, message = FALSE}
+Temp_all_std$station <- as.factor(Temp_all_std$station) # need to factorize the "stations"
+#Get the list of unique MP names
+for (name in levels(Temp_all_std$station)) {
+  #Subset the data station
+  tmp=subset(Temp_all_std,station==name)
+  #Create a new filename for each station. Designate the folder you want the files in.
+  fn=paste('TempData/Std/Individual/',name, "_std_sin.csv", sep="")
+  #Save the CSV file for each station
+  write_csv(tmp,fn)
+}
 ```
 
