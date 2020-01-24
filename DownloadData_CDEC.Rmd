@@ -239,14 +239,15 @@ rm(Temp_F, Temp_FtoC, Temp_C)
 
 # Merge converted temp data frames together 
 Temp_all_std <- rbind(Temp_C_1, Temp_C_2)
-saveRDS(Temp_all_std, "TempData/Std/Temp_C_all_std.rds") # Write rds
-write_csv(Temp_all_std, "Tempdata/std/Temp_C_all_std.csv") # write csv
+saveRDS(Temp_all_std, "TempData/Std/Temp_all_std.rds") # Write rds
+write_csv(Temp_all_std, "Tempdata/std/Temp_all_std.csv") # write csv
 
 
 ```
 
 
 Write individual files for each station
+CSV - includes event and hourly data all combined
 
 ```{r Individual station files, message = FALSE}
 Temp_all_std$station <- as.factor(Temp_all_std$station) # need to factorize the "stations"
@@ -259,5 +260,46 @@ for (name in levels(Temp_all_std$station)) {
   #Save the CSV file for each station
   write_csv(tmp,fn)
 }
+```
+
+Convert data to hourly
+
+```{r Hourly}
+
+# Add some columns to sort by date
+Temp_all_std$station <- as.factor(Temp_all_std$station)
+Temp_all_std$date <- as.Date(Temp_all_std$datetime, format = "%Y-%m-%d")
+Temp_all_std$year <- year(Temp_all_std$datetime)
+Temp_all_std$yrMon <- format(as.Date(Temp_all_std$date), "%y-%m")
+#Temp_all_std$ymon1 <- as.Date(paste(Temp_all_std$yrMon, "-01", sep=""))
+Temp_all_std$hour <- hour(Temp_all_std$datetime)
+Temp_all_std$minute <- minute(Temp_all_std$datetime)
+
+# Remove any row where Temp=NA
+temp_H_0 <- Temp_all_std %>%
+  filter(!is.na(Temp))
+
+# Convert temperature data to hourly
+temp_H <- temp_H_0 %>%
+  group_by(station, date, hour) %>% #group (calculations) by these vars
+  arrange(station, date, hour, minute) %>% #arrange in order of these vars to visualize duplication
+  slice(1) %>% #subset only the first value for each station, date, hour group.
+  ungroup()
+
+# Check that they are all good!
+# Just change the name of the file. 
+check <- temp_H %>%
+  group_by(station, date, hour)%>%
+  summarize(vals = n())
+which(check$vals >1) # this should be 0
+
+# remove data not needed
+rm(temp_all, temp_H_0, check)
+gc()
+
+# Write data
+saveRDS(temp_H, "TempData/Hourly/Temp_all_H.rds") # Write rds
+write_csv(temp_H, "TempData/Hourly/Temp_all_H.csv") # write csv
+
 ```
 
