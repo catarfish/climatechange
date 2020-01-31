@@ -102,9 +102,8 @@ temp_q2_a <- repeating_values(df = temp_q1, x = 10) %>%
   mutate(Flag_QC2_a = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N")) %>%
   dplyr::select(-starts_with("same"))
 
-check <- temp_q2_a %>%
-  filter(Flag_QC2_b == "Y")
-
+###---------------------------------------------------------
+### Rosie: Attempt to apply flags to all repeating values:::
 test = temp_q2_a
 
 test$Flag_QC2_b = NA
@@ -114,10 +113,7 @@ ifelse(test$Flag_QC2_a[i] == "Y",
       for (j in 1:18) test$Flag_QC2_a2[i-j] =="Y", "N")
 
 }
-  
-hcheck <- temp_q2_a%>%
-  filter(Flag_QC2_a2 == "Y")
-
+###-------------------------------------------------------------
 
 # Create another flag that applies the "Y" to the whole day
 temp_q2 <- temp_q2_a %>%
@@ -132,12 +128,11 @@ temp_q2_b <- temp_q2 %>%
 rm(temp_q2_a, temp_q1)
 gc()
 
-
-
+# Look at how often there are less than 24 observations
 obs <- temp_q2 %>%
   group_by(station, date)%>%
   summarize(obs = n()) %>%
-  filter(obs<23)
+  filter(obs<24)
 ```
 
 ### QA3: Rate of change and Spike test
