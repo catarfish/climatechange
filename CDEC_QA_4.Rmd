@@ -91,18 +91,35 @@ repeating_values <- function(df, x) {
   return(df)
     }
 
-### delta --------------------------------------------------
+### --------------------------------------------------
 temp_q1$Temp <- as.numeric(temp_q1$Temp)
 
 # Run function repeating values. 
 # Tally up "same" columns (same_total)
 # Create column "delete" - if same_total = x (represented by max(same_total), delete = Y)
-temp_q2_a <- repeating_values(df = temp_q1, x = 18) %>% 
+temp_q2_a <- repeating_values(df = temp_q1, x = 10) %>% 
   mutate(same_total = as.numeric(rowSums(select(., contains("same"))))) %>%
   mutate(Flag_QC2_a = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N")) %>%
-  select(-starts_with("same"))
+  dplyr::select(-starts_with("same"))
 
-# Apply another flag to delete the whole day
+check <- temp_q2_a %>%
+  filter(Flag_QC2_b == "Y")
+
+test = temp_q2_a
+
+test$Flag_QC2_b = NA
+
+for (i in 1:nrow(test)) {
+ifelse(test$Flag_QC2_a[i] == "Y", 
+      for (j in 1:18) test$Flag_QC2_a2[i-j] =="Y", "N")
+
+}
+  
+hcheck <- temp_q2_a%>%
+  filter(Flag_QC2_a2 == "Y")
+
+
+# Create another flag that applies the "Y" to the whole day
 temp_q2 <- temp_q2_a %>%
   group_by(station, date)%>%
   mutate(Flag_QC2_b = ifelse("Y" %in% Flag_QC2_a, "Y", "N"))
@@ -114,11 +131,18 @@ temp_q2_b <- temp_q2 %>%
 # Remove unnecessaries
 rm(temp_q2_a, temp_q1)
 gc()
+
+
+
+obs <- temp_q2 %>%
+  group_by(station, date)%>%
+  summarize(obs = n()) %>%
+  filter(obs<23)
 ```
 
 ### QA3: Rate of change and Spike test
 ```{r Rate of Change}
-### delta ---------------------------------------------
+### ---------------------------------------------
 # Q3: Temp - Temp-1
 # sdev_th: Determined threshold for too high of a rate of change (3 * SD(Temp) over 25 days)
 # If Q3 > sdev_th, flag.
@@ -186,10 +210,28 @@ ggplot(Tdiff_distrib, aes(x = station, y = percent.large)) +
 ## How much data are being removed?
 ```{r Data removal}
 
+removed_all <- temp_q4 %>%
+  summarize(Init = n(),
+            QC1 = sum(Flag_QC1=="Y"),
+            QC2 = sum(Flag_QC2_b == "Y"),
+            QC3 = sum(Flag_QC3 == "Y", na.rm = TRUE),
+            QC4 = sum(Flag_QC4 == "Y"),
+            Remaining = sum(Flag_QC1=="N" & Flag_QC2_b == "N" & Flag_QC3 =="N" & Flag_QC4 =="N", na.rm = TRUE),
+            Prop = round(Remaining/Init*100,1))
 
 
+removed_sta <- temp_q4 %>%
+  group_by(station) %>%
+  summarize(Init = n(),
+            QC1 = sum(Flag_QC1=="Y"),
+            QC2 = sum(Flag_QC2_b == "Y"),
+            QC3 = sum(Flag_QC3 == "Y", na.rm = TRUE),
+            QC4 = sum(Flag_QC4 == "Y"),
+            Remaining = sum(Flag_QC1=="N" & Flag_QC2_b == "N" & Flag_QC3 =="N" & Flag_QC4 =="N", na.rm = TRUE),
+            Prop = round(Remaining/Init*100,1)) %>%
+  arrange(Prop)
 
-
+a <- as.list(removed_sta)
 ```
 
 
