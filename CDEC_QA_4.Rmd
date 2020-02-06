@@ -25,9 +25,9 @@ library(lubridate)
 library(TTR) # rate of change
 library(caTools) # rate of change
 
-setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/")
+#setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/")
 #### Read files ###
-temp_H_0 <- readRDS("climatechange/WaterTemp/data/Temp_all_H.rds")
+temp_H_0 <- readRDS("TempData/Temp_all_H.rds")
 
 # Filter out stations that are not contiguous.
 temp_H <- temp_H_0 %>% 
@@ -104,15 +104,24 @@ temp_q2_a <- repeating_values(df = temp_q1, x = 10) %>%
 
 ###---------------------------------------------------------
 ### Rosie: Attempt to apply flags to all repeating values:::
-test = temp_q2_a
+test = temp_q2_a[1:200000,]
 
 test$Flag_QC2_b = NA
 
-for (i in 1:nrow(test)) {
-ifelse(test$Flag_QC2_a[i] == "Y", 
-      for (j in 1:18) test$Flag_QC2_a2[i-j] =="Y", "N")
+bad = which(test$Flag_QC2_a == "Y")
 
+#maybe a fucntion will help
+
+foo =  map(bad, function(x) {
+  for (i in 1:nrow(test)) {
+    if_else( (test[x] - testx[i <= 10, test[i]
+  
+
+  ifelse(test$Flag_QC2_a == "Y")
 }
+  )
+
+
 ###-------------------------------------------------------------
 
 # Create another flag that applies the "Y" to the whole day
