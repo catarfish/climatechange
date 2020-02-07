@@ -62,7 +62,7 @@ temp_q1 <- temp_H %>%
   left_join(temp_q1_a, by = c("station", "date"))
 
 # Remove unnecessaries
-rm(temp_q1_a)
+#rm(temp_q1_a)
 gc()
 
 ```
@@ -121,12 +121,15 @@ temp_q2_b <- temp_q2_a %>%
   filter(Flag_repeats == "Y")
 
 # Remove unnecessaries
-rm(temp_q2_a, temp_q1)
+#rm(temp_q2_a, temp_q1)
 gc()
 
 ```
 
 ### QA3: Rate of change and Spike test
+
+Unfortnately, this method doesn't deal with groups of bad data (like when the sonde has been out of the water for a few hours). It gets rid of the first and last "bad" dat ponit, but not the ones in between. We may need to group the data based on the bad data points and use a cumsum to identify the groups. Then compare group mean?
+
 ```{r Rate of Change}
 ### ---------------------------------------------
 # Q3: Temp - Temp-1
@@ -134,19 +137,29 @@ gc()
 # If Q3 > sdev_th, flag.
 # Additionally, if Q3 > 5 (5 degree change in 15 minutes), flag. 
 
-temp_q3_a <- temp_q2 %>%
+temp_q3_a <- temp_q2_a %>%
   group_by(station) %>%
   arrange(station, datetime) %>%
-  mutate(QC3 = abs(Temp- lag(Temp, n = 1)))%>%
+  mutate(QC3 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
   mutate(sdev_th = 3 * runSD(Temp, 25))%>%
-  mutate(Flag_QC3 = ifelse((QC3 > sdev_th | QC3 > 5), "Y", "N")) %>%
+  mutate(Flag_QC3 = ifelse((QC3 > sdev_th | QC3 > 5), "Y", "N"))  %>%
+
+  mutate(Flag_QC3 = replace(Flag_QC3, is.na(Flag_QC3), "N")) %>%
   ungroup()
+
+
 
 temp_q3_b <- temp_q3_a %>%
   filter(Flag_QC3 == "Y")
 
 temp_q3 <- temp_q3_a %>%
   select(-c(sdev_th, QC3))
+
+temptest = temp_q3_a %>%
+  mutate(Flag_spike = cumsum(Flag_QC3 == "Y"))
+
+temptest$Flag_spike = cumsum(temptest$Flag_QC3 == "Y")
+
 
 rm(temp_q3_a)
 
