@@ -69,79 +69,61 @@ gc()
 
 ## QA2) Remove if there are more than 12 repeating values in a row
 
-1. Create new columns indicating whether the temperature at x hour is the same as that of x-1 hours, x-2 hours, x-3 hours, x-4 hours. (1 = yes, 0 = no)
-2. Add the columns up. If all values are the same, "delete"  = 4. 
-3. Filter out rows to be deleted. 
-4. Use antijoin to extract dates that are not in the "delete" data frame. 
-    + Note: the "delete" data frame has only the rows where delete = 4, but we want to delete the entire day if there are repeating values, so we need to specify by = station, date. 
+With help from Michael K!
+
+1. Create new columns indicating whether the temperature at x hour is the same as that of x-1 hours.
+2. Take a cumulative sum of all the rows where temperatures are different
+3. Group by the sum and count up the number of rows where the temperature is the same.
+4. Flag the rows where number of repeated values is above our cut-off
+5. Filter out rows that we flagged
+
 
 ```{r repeating values, message = FALSE}
 
 # Function to determine whether values are repeating by each station
 # Inputs are data frame and x (number of repeating values you want to check for)
-repeating_values <- function(df, x) {
-  df %>% 
-    group_by(station) %>%
-    arrange(station, date, hour)
-  for (i in 1:x) {
-    print(i)
-    same <- paste0('same', i)
-    df[[same]]<- ifelse(df$Temp == lag(df$Temp, n = i), 1, 0)
-  }
+
+repeating_vals = function(df, x){
+  df$same = ifelse(df$Temp == lag(df$Temp, 1, default = 0), 1L, 0L)
+  df = df %>%
+    mutate(issame = cumsum(df$same == 0L)) #%>%
+    df = df %>%group_by(station, issame) %>%
+    mutate(flag = sum(same)+1 ) %>%
+    ungroup() %>%
+    mutate(Flag_repeats = ifelse(flag > x, "Y", "N"))
   return(df)
-    }
+}
+
+#test it real quick
+#test = temp_q1[1:200000,]
+
+#test2 = repeating_vals(test, 10)
+#bads = filter(test2, Flag_repeats == "Y")
+#OMG IT WORKED!
+
+
+#Techinically, "==" shouldn't work for decimals
 
 ### --------------------------------------------------
 temp_q1$Temp <- as.numeric(temp_q1$Temp)
 
-# Run function repeating values. 
-# Tally up "same" columns (same_total)
-# Create column "delete" - if same_total = x (represented by max(same_total), delete = Y)
-temp_q2_a <- repeating_values(df = temp_q1, x = 10) %>% 
-  mutate(same_total = as.numeric(rowSums(select(., contains("same"))))) %>%
-  mutate(Flag_QC2_a = ifelse(same_total == max(same_total, na.rm = TRUE),"Y", "N")) %>%
-  dplyr::select(-starts_with("same"))
+# Run function repeating values and get rid of the columns we don't need
+temp_q2_a <- repeating_vals(df = temp_q1, x = 10) %>%
+  select(-flag, -issame, -same)
 
-###---------------------------------------------------------
-### Rosie: Attempt to apply flags to all repeating values:::
-test = temp_q2_a[1:200000,]
-
-test$Flag_QC2_b = NA
-
-bad = which(test$Flag_QC2_a == "Y")
-
-#maybe a fucntion will help
-
-foo =  map(bad, function(x) {
-  for (i in 1:nrow(test)) {
-    if_else( (test[x] - testx[i <= 10, test[i]
-  
-
-  ifelse(test$Flag_QC2_a == "Y")
-}
-  )
 
 
 ###-------------------------------------------------------------
 
-# Create another flag that applies the "Y" to the whole day
-temp_q2 <- temp_q2_a %>%
-  group_by(station, date)%>%
-  mutate(Flag_QC2_b = ifelse("Y" %in% Flag_QC2_a, "Y", "N"))
 
 # Create a dataframe of all the flagged rows
-temp_q2_b <- temp_q2 %>%
-  filter(Flag_QC2_b == "Y")
+temp_q2_b <- temp_q2_a %>%
+  filter(Flag_repeats == "Y")
 
 # Remove unnecessaries
 rm(temp_q2_a, temp_q1)
 gc()
 
-# Look at how often there are less than 24 observations
-obs <- temp_q2 %>%
-  group_by(station, date)%>%
-  summarize(obs = n()) %>%
-  filter(obs<24)
 ```
 
 ### QA3: Rate of change and Spike test
