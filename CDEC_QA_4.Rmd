@@ -24,10 +24,11 @@ library(readr)
 library(lubridate)
 library(TTR) # rate of change
 library(caTools) # rate of change
+library(ggiraph)
 
-#setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/")
+setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/")
 #### Read files ###
-temp_H_0 <- readRDS("TempData/Temp_all_H.rds")
+temp_H_0 <- readRDS("climatechange/WaterTemp/data/Temp_all_H.rds")
 
 # Filter out stations that are not contiguous.
 temp_H <- temp_H_0 %>% 
@@ -79,50 +80,45 @@ With help from Michael K!
 
 
 ```{r repeating values, message = FALSE}
+# Significant help from Michael Koohafkan and Rosie Hartman
 
 # Function to determine whether values are repeating by each station
 # Inputs are data frame and x (number of repeating values you want to check for)
+# Check if number is same as previous number. If yes, 1. If no, 0.
+# Cumulative sum so each time a value repeats, cumulative sum goes up
+# Count the number in a row that are the same
+# Flag if that number > threshold 
 
 repeating_vals = function(df, x){
   df$same = ifelse(df$Temp == lag(df$Temp, 1, default = 0), 1L, 0L)
   df = df %>%
-    mutate(issame = cumsum(df$same == 0L)) #%>%
-    df = df %>%group_by(station, issame) %>%
+    mutate(issame = cumsum(df$same == 0L)) %>%
+    group_by(station, issame) %>%
     mutate(flag = sum(same)+1 ) %>%
     ungroup() %>%
     mutate(Flag_repeats = ifelse(flag > x, "Y", "N"))
   return(df)
 }
 
-#test it real quick
-#test = temp_q1[1:200000,]
 
-#test2 = repeating_vals(test, 10)
-#bads = filter(test2, Flag_repeats == "Y")
-#OMG IT WORKED!
-
-
-#Techinically, "==" shouldn't work for decimals
-
-### --------------------------------------------------
+### Run function --------------------------------------------------
 temp_q1$Temp <- as.numeric(temp_q1$Temp)
 
 # Run function repeating values and get rid of the columns we don't need
-temp_q2_a <- repeating_vals(df = temp_q1, x = 10) %>%
-  select(-flag, -issame, -same)
-
-
+temp_q2 <- repeating_vals(df = temp_q1, x = 10) %>%
+  select(-flag, -issame, -same) %>%
+  rename(Flag_QC2 = Flag_repeats)
 
 ###-------------------------------------------------------------
 
 
 # Create a dataframe of all the flagged rows
-temp_q2_b <- temp_q2_a %>%
-  filter(Flag_repeats == "Y")
+temp_q2_b <- temp_q2 %>%
+  filter(Flag_QC2 == "Y")
 
 # Remove unnecessaries
 #rm(temp_q2_a, temp_q1)
-gc()
+#gc()
 
 ```
 
@@ -133,38 +129,97 @@ Unfortnately, this method doesn't deal with groups of bad data (like when the so
 ```{r Rate of Change}
 ### ---------------------------------------------
 # Q3: Temp - Temp-1
-# sdev_th: Determined threshold for too high of a rate of change (3 * SD(Temp) over 25 days)
+# sdev_th: Determined threshold for too high of a rate of change (3 * SD(Temp) over 25 hours)
 # If Q3 > sdev_th, flag.
-# Additionally, if Q3 > 5 (5 degree change in 15 minutes), flag. 
+# Additionally, if Q3 > 5 (5 degree change in 1 hour), flag. 
 
-temp_q3_a <- temp_q2_a %>%
+temp_q3_a <- temp_q2 %>%
   group_by(station) %>%
   arrange(station, datetime) %>%
   mutate(QC3 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
   mutate(sdev_th = 3 * runSD(Temp, 25))%>%
-  mutate(Flag_QC3 = ifelse((QC3 > sdev_th | QC3 > 5), "Y", "N"))  %>%
-
-  mutate(Flag_QC3 = replace(Flag_QC3, is.na(Flag_QC3), "N")) %>%
+   mutate(Flag_sdev = ifelse((QC3 > sdev_th | QC3 > 5), "Y", "N"))  %>%
+      mutate(Flag_sdev = replace(Flag_sdev, is.na(Flag_sdev), "N")) %>%
   ungroup()
 
+# b <- temp_q3_a %>% filter(Flag_sdev == "Y")
 
+    # This would address situations in which there is a single point that is influencing
+    # sd calculation for later values - redo calculations based on unflagged data. Will need to edit
+    # variable names 
+    #
+# temp_q3_a_2 <- temp_q3_a %>%
+#   filter(Flag_QC3a == "N") %>%
+#   group_by(station) %>%
+#   arrange(station, datetime) %>%
+#   mutate(QC3 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
+#   mutate(sdev_th = 3 * runSD(Temp, 25))%>%
+#   mutate(Flag_sdev = ifelse((QC3 > sdev_th | QC3 > 5), "Y", "N"))  %>%
+#   mutate(Flag_sdev = replace(Flag_sdev, is.na(Flag_sdev), "N")) %>%
+#   ungroup()
 
-temp_q3_b <- temp_q3_a %>%
+# Clean up original
+temp_q3_c <- temp_q3_a %>%
+  select(-c(QC3))
+
+# Cumsum every time there is a flagged value to separate data into different groups
+# each time there is a spike
+temp_q3_d = temp_q3_c %>%
+  mutate(Flag_spike = cumsum(Flag_sdev == "Y"))
+
+# Compare groups of values with each other 
+temp_q3_e <- temp_q3_d %>%
+  group_by(station, Flag_spike) %>%
+  summarize(tempi = first(Temp),
+         tempf = last(Temp),
+         sdev_thlast = round(last(sdev_th),3),
+         n = n()) %>%
+  mutate(tempfprev = lag(tempf, 1),
+         tempfprev2 = lag(tempf, 2),
+         tempinext = lead(tempi, 1),
+         temp_diff1 = abs(tempi - tempfprev),
+         temp_diff2 = abs(tempi - tempfprev2),
+         temp_diffnext = abs(tempinext-tempf),
+         sdev_thprev = lag(sdev_thlast, 1),
+         sdev_thprev2 = lag(sdev_thlast,2)) %>%
+  mutate(Flag_QC3 = ifelse((temp_diff1 > sdev_thprev & temp_diff2 > sdev_thprev2 & temp_diffnext > sdev_thlast) | temp_diff1 > 5, "Y", "N" ))
+
+# Merge summarized calculations/flags from e back in with rest of the data
+# Remove some rows
+temp_q3_f <- left_join(temp_q3_d, temp_q3_e, by = c("station", "Flag_spike"))%>%
+  select(-c(tempi:sdev_thprev2))
+
+# Use these if doing the temp_q3_a_2 flag
+# temp_q3_f_merge <- temp_q3_f %>%select(station, datetime, Flag_spike, Flag_QC3)
+#                                            
+# temp_q3 <- left_join(temp_q3_a, temp_q3_f_merge) 
+#       mutate(Flag_QC3 = replace(Flag_QC3, Flag_QC3a == "Y", "Y"))
+      
+# Replace NAs with Flag of "N"
+temp_q3 <- temp_q3_f %>%
+             mutate(Flag_QC3 = replace(Flag_QC3, is.na(Flag_QC3), "N"))    
+
+# Filter out Flagged values
+temp_q3_b <- temp_q3 %>%
   filter(Flag_QC3 == "Y")
 
-temp_q3 <- temp_q3_a %>%
-  select(-c(sdev_th, QC3))
+############ test
+      
+statest <- c("ANC", "BET", "BAC", "VOL")
+testq3 <- temp_q3 %>%
+  filter(station %in% statest)
+      
+ggplot(testq3, aes(x = datetime, y = Temp, col = Flag_QC3) ) +
+  geom_point() +
+  #scale_color_discrete(values = c("green", "blue")) +
+  facet_wrap(~station, scales = "free") 
 
-temptest = temp_q3_a %>%
-  mutate(Flag_spike = cumsum(Flag_QC3 == "Y"))
-
-temptest$Flag_spike = cumsum(temptest$Flag_QC3 == "Y")
+#########################################################
 
 
-rm(temp_q3_a)
+#rm(temp_q3_a)
 
 ```
-
 
 
 ## QA4): Remove anything outside of reasonable temperature range (0-40)
