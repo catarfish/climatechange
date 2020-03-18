@@ -77,7 +77,9 @@ ui <- fluidPage(
               h4("Plot: Pre-QC with removed values"),
               h5("Yellow = Missing values, Red = Repeating values, Green = Rate of Change, 
               Bright Blue = Temp Range"),
-              plotOutput("preQC"),
+              plotOutput("preQC", dblclick = "preQC_dblclick",
+                         brush = brushOpts(id = "preQC_brush",
+                                           resetOnNew = TRUE)),
               h4("Plot: Filtered for easier viewing"),
               plotOutput("postQC_F")
               
@@ -100,8 +102,7 @@ server <- function(input, output) {
   ###################################################################
   ## Plot 1: PreQC ------------------------------------------------------------ 
   ##################################################################
-  
-  #ranges <- reactiveValues(x = NULL, y = NULL)
+  ranges <- reactiveValues(x = NULL, y = NULL)
   
   output$preQC <- renderPlot({
     # This will initiate the submit button
@@ -245,16 +246,19 @@ server <- function(input, output) {
     # # Calculate number of deleted rows from all QC
     deleted_total <- nrow(temp_q1_b) + nrow(temp_q2_b) + nrow(temp_q3_b) + nrow(temp_q4_b) 
     
-    # Plot the data ########################################################################################
-    # Each displays the deleted data in a different color, along with the "cleaned" data. 
-    # Annotation custom displays the deleted rows in the center of the plot
+    # This little if section somehow makes the time datetime plot. Without this it breaks!
+    if (!is.null(ranges$x)) {
+      ranges$x <- as.POSIXct(ranges$x, origin = "1970-01-01")
+    }
+    
+    # Plot data
     ggplot() +
       geom_point(data = temp_q4, aes(datetime, Temp), col = "lightsteelblue3") +
       geom_point(data = temp_q1_b, aes(datetime, Temp), color = "goldenrod2", size = 2) +
       geom_point(data = temp_q2_b, aes(datetime, Temp), color = "indianred3", size = 2) +
       geom_point(data = temp_q3_b, aes(datetime, Temp), color = "springgreen4", size = 2) +
       geom_point(data = temp_q4_b, aes(datetime, Temp), color = "cyan3", size = 2) +
-      #coord_cartesian(xlim = ranges$x, ylim = ranges$y, expand = FALSE) +
+      coord_cartesian(xlim = ranges$x, ylim = ranges$y, expand = TRUE) +
       #annotation_custom(grob = grid::textGrob(paste(deleted_total, "deleted values")),
       #                  xmin = -Inf, xmax = Inf, ymin = max(temp_sta$Temp), ymax = max(temp_sta$Temp)) +
       scale_x_datetime() + #ylim(0,30) +
@@ -264,6 +268,21 @@ server <- function(input, output) {
             axis.text.x = element_text(angle = 90, hjust = 1))
     
   })
+  
+  # When a double-click happens, check if there's a brush on the plot.
+  # If so, zoom to the brush bounds; if not, reset the zoom.
+  observeEvent(input$preQC_dblclick, {
+    brush <- input$preQC_brush
+    if (!is.null(brush)) {
+      ranges$x <- c(brush$xmin, brush$xmax)
+      ranges$y <- c(brush$ymin, brush$ymax)
+      
+    } else {
+      ranges$x <- NULL
+      ranges$y <- NULL
+    }
+  })
+    
   ############################################################################
   ## Plot2: PostQC Final ----------------------------------------------------------------
   ##############################################################################
