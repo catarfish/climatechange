@@ -124,7 +124,157 @@ temp_q2_b <- temp_q2 %>%
 
 ### QA3: Rate of change and Spike test
 
-Unfortnately, this method doesn't deal with groups of bad data (like when the sonde has been out of the water for a few hours). It gets rid of the first and last "bad" dat ponit, but not the ones in between. We may need to group the data based on the bad data points and use a cumsum to identify the groups. Then compare group mean?
+Unfortunately, this method doesn't deal with groups of bad data (like when the sonde has been out of the water for a few hours). It gets rid of the first and last "bad" dat ponit, but not the ones in between. We may need to group the data based on the bad data points and use a cumsum to identify the groups. Then compare group mean?
+
+```{r GAM}
+library(mgcv)
+
+# test set
+temp_q3_test <- temp_q2 %>% filter(station %in% c("ANC" )) %>%
+  filter(Temp <40 & Temp >1)
+
+
+head(temp_q3_test)
+
+# Plot data within range
+ggplot(temp_q3_test, aes(x = datetime, y = Temp)) + geom_point(size = 5) +theme_bw()
+
+# Standardize datetime
+temp_q3_test$datetime_n <- as.numeric(temp_q3_test$datetime)
+temp_q3_t <- temp_q3_test %>%
+  filter(!is.na(datetime_n)) %>%
+  group_by(station) %>%
+  mutate(datetime_s = (datetime_n - mean(datetime_n)) / sd(datetime_n) )
+head(temp_q3_t)
+ggplot(temp_q3_t, aes(x = datetime_s, y = Temp)) + geom_point(size = 5)
+
+# Run GAM
+gam1 <- gam(Temp ~ s(datetime_s), data = temp_q3_t, method = "REML")
+gam2 <- gam(Temp ~s(datetime_s), data = temp_q3_t)
+
+# Look at results
+summary(gam1)
+plot(gam1, pages = 1, all.terms = TRUE)
+
+summary(gam2)
+plot(gam2)
+
+# Residuals
+gam1$residuals <- residuals(gam1)
+plot(gam1$residuals)
+par(mfrow = c(2,2))
+gam.check(gam1)
+
+
+#-----Multiple Stations-----------------------------------------------------
+# test set
+temp_q3_test2 <- temp_q2 %>% filter(station %in% c("LIS", "DWS", "RYI")) %>% filter(Temp>1 & Temp < 40)
+
+# Plot data within range
+ggplot(temp_q3_test2, aes(x = datetime, y = Temp)) + geom_point(size = 2) +theme_bw() + 
+  facet_wrap(~station, scales = "free")
+
+# Standardize datetime
+temp_q3_test2$datetime_n <- as.numeric(temp_q3_test2$datetime)
+temp_q3_t2 <- temp_q3_test2 %>%
+  filter(!is.na(datetime_n)) %>%
+  group_by(station) %>%
+  mutate(datetime_s = (datetime_n - mean(datetime_n)) / sd(datetime_n) )
+head(temp_q3_t2)
+ggplot(temp_q3_t2, aes(x = datetime_s, y = Temp)) + geom_point(size = 5) + facet_wrap(~station, scales = "free")
+
+# Run GAM
+gam3 <- gam(Temp ~ s(datetime_s, by = station), data = temp_q3_t2, method = "REML")
+gam4 <- gam(Temp ~s(datetime_s, k = 20), data = temp_q3_t2)
+
+# Look at results
+summary(gam3)
+plot(gam3, pages = 1, all.terms = TRUE)
+
+summary(gam4)
+plot(gam4)
+
+# Residuals
+gam3$residuals <- residuals(gam3)
+plot(gam3, pages = 1, all.terms = TRUE, residuals = TRUE, pch = 1, cex = 1)
+
+gam4$residuals <- residuals(gam4)
+plot(gam4, pages = 1, all.terms = TRUE, residuals = TRUE, pch = 1, cex = 1)
+
+par(mfrow = c(2,2))
+gam.check(gam3)
+
+par(mfrow = c(2,2))
+gam.check(gam4)
+```
+
+
+
+```{r anomalize}
+library(tidyverse)
+library(anomalize)
+library(tibbletime)
+
+temp_q3_t <- temp_q2 %>% filter(!is.na(datetime)) %>% filter(station %in% c("LIS", "RYI", "DWS"))
+temp_q = as_tbl_time(temp_q3_t, index = datetime)
+
+temp_q_a <- temp_q %>%
+    # Data Manipulation / Anomaly Detection
+    filter(Temp>0 & Temp < 40) %>%
+    group_by(station) %>%
+    time_decompose(Temp, method = "twitter") %>%
+    anomalize(remainder, method = "iqr") %>%
+    time_recompose()
+    # Anomaly Visualization
+    plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.25) 
+    #labs(title = "Did this work?", subtitle = "STL + IQR Methods")
+
+    temp_q_a2 <- temp_q_a %>% select(c(datetime, station, anomaly))
+    temp_q_a2 <- as_tibble(temp_q_a2)
+temp_q3_merge <- inner_join(temp_q3_t, temp_q_a2, by = c("station", "datetime"))
+
+temp_q3_merge$anomaly <- as.factor(temp_q3_merge$anomaly)
+ggplot(temp_q3_merge, aes(x = datetime, y = Temp, col = anomaly)) + geom_point() + facet_wrap(~station, scales = "free") +
+   scale_colour_brewer(palette="Dark2")
+
+
+temp_q %>%
+    # Data Manipulation / Anomaly Detection
+    filter(station %in% c("LIS")) %>%
+    filter(Temp>0 & Temp < 40) %>%
+    time_decompose(Temp, method = "twitter") %>%
+    anomalize(remainder, method = "iqr") %>%
+    time_recompose() %>%
+    # Anomaly Visualization
+    plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.25) +
+    labs(title = "Did this work?", subtitle = "Twitter + IQR Methods") 
+
+temp_q %>%
+    # Data Manipulation / Anomaly Detection
+    filter(station %in% c("LIS")) %>%
+    filter(Temp>0 & Temp < 40) %>%
+    time_decompose(Temp, method = "twitter") %>%
+    anomalize(remainder, method = "gesd") %>%
+    time_recompose() %>%
+    # Anomaly Visualization
+    plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.25) +
+    labs(title = "Did this work?", subtitle = "Twitter + GESD Methods")
+
+a <- temp_q %>%
+    # Data Manipulation / Anomaly Detection
+    filter(station %in% c("LIS")) %>%
+    filter(Temp>0 & Temp < 40) %>%
+    time_decompose(Temp, method = "twitter") %>%
+    anomalize(remainder, method = "iqr") %>%
+    time_recompose()
+
+
+```
+
+
+
+
+
 
 ```{r Rate of Change}
 ### ---------------------------------------------
