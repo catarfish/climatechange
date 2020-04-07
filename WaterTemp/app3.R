@@ -43,7 +43,9 @@ repeating_vals = function(df, x){
 ui <- fluidPage(
   
   # Application title
-  titlePanel("QC Water temperature data"),
+  titlePanel("Water Temperature Synthesis QC App"),
+  
+  h4("Alter the inputs on the left sidebar to edit the data"),
   
   # Sidebar with a slider input for number of bins
   sidebarLayout(
@@ -53,6 +55,9 @@ ui <- fluidPage(
       uiOutput("station_selector"), # See station_selector in server section
       dateRangeInput("daterange", "Date Range:",
                      start = "2010-01-01", end = "2018-01-01", min = "1980-01-01", startview = "decade"),
+            sliderInput("temprange",
+                  "Temperature Cutoffs:",
+                  min = -10, max = 100,value = c(1,40)),
       numericInput("missvals",
                    "Missing Values allowed per day:",
                    min = 0, max = 24, value = 5),
@@ -69,22 +74,29 @@ ui <- fluidPage(
       selectInput("remainder",
                   "Remainder Analysis Type (IQR: 3x above, 3x below IQR, GESD: progressively removes critical values, iterative:",
                   list("IQR", "GESD")),
-      sliderInput("temprange",
-                  "Temperature Cutoffs:",
-                  min = -10, max = 100,value = c(0,40)),
+
       actionButton("submit", "Submit")
     ),
     
     # main panel
-    mainPanel(h4("Values removed"),
+    mainPanel(h3("Values Flagged"),
               tableOutput("vals_removed"),
-              h4("Plot: Pre-QC with removed values"),
-              h5("Yellow = Missing values, Red = Repeating values, Green = Rate of Change, 
-              Bright Blue = Temp Range"),
+              h3("Plot: Pre-QC with flagged values"),
+              p(strong("To zoom in, highlight points, then double click inside")),
+              
+              p(strong(span("Blue", style = "color:darkturquoise")),
+              "= Temperature limits"),
+              p(strong(span("Yellow", style= "color:gold")),
+              "= Missing values"),
+              p(strong(span("Red", style = "color:firebrick")),
+              "= Repeating values"),
+              p(strong(span("Green", style = "color:seagreen")),
+              "= Rate of Change/ Anomalies"), 
+              
               plotOutput("preQC", dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
                                            resetOnNew = TRUE)),
-              h4("Plot: Filtered for easier viewing"),
+              h3("Plot: Filtered for temperature limits"),
               plotOutput("postQC_F")
               
     )
@@ -115,75 +127,102 @@ server <- function(input, output) {
   })
   
   ### QC Range for acceptable temperatures ###
-  temp_q4 <- eventReactive(input$submit, { 
+  temp_q1 <- eventReactive(input$submit, { 
     temp_sta() %>%
       filter(!is.na(datetime)) %>%
-      mutate(Flag_QC4 = ifelse((Temp<input$temprange[1] | Temp>input$temprange[2]), "Y", "N"))
+      mutate(Flag_QC1 = ifelse((Temp<input$temprange[1] | Temp>input$temprange[2]), "Y", "N"))
     
   })
   
   ### Missing values ###
-  temp_q1_a <- eventReactive(input$submit,{
-    temp_q4() %>%
+  temp_q2_a <- eventReactive(input$submit,{
+    temp_q1() %>%
       group_by(station, date) %>%
       arrange(station, date, hour) %>%
       summarise(total = length(date)) %>%
-      mutate(Flag_QC1 = ifelse(total<(24-(input$missvals)), "Y", "N"))
+      mutate(Flag_QC2 = ifelse(total<(24-(input$missvals)), "Y", "N"))
   })
   
-  temp_q1 <- eventReactive(input$submit, {
-    dplyr::left_join(temp_q4(), temp_q1_a(), by = c("station", "date"))
+  temp_q2 <- eventReactive(input$submit, {
+    dplyr::left_join(temp_q1(), temp_q2_a(), by = c("station", "date"))
   })
 
   ### Repeating Values
-  temp_q2 <- eventReactive(input$submit, {
-    repeating_vals(df = temp_q1(), x = input$repeatvals)%>%
-    rename(Flag_QC2 = Flag_repeats) })
+  temp_q3 <- eventReactive(input$submit, {
+    repeating_vals(df = temp_q2(), x = input$repeatvals)%>%
+    rename(Flag_QC3 = Flag_repeats) })
   
   
   ### Anomalies
-  temp_q3_a <- eventReactive(input$submit,{
-    as_tbl_time(temp_q2(), index = datetime)})
+  temp_q4_a <- eventReactive(input$submit,{
+    as_tbl_time(temp_q3(), index = datetime)})
   
-  temp_q3_c <- eventReactive(input$submit, {
-    temp_q3_a() %>%
+  temp_q4_c <- eventReactive(input$submit, {
+    temp_q4_a() %>%
     time_decompose(Temp, method = input$seasonal, trend = input$trend) %>%
     anomalize(remainder, method = input$remainder) %>%
     time_recompose() %>% 
     select(c(datetime, anomaly)) %>%
     as_tibble() })
   
-  temp_q3_d <- eventReactive(input$submit, {
-    inner_join(temp_q2(), temp_q3_c(), by = c( "datetime")) })
+  temp_q4_d <- eventReactive(input$submit, {
+    inner_join(temp_q3(), temp_q4_c(), by = c( "datetime")) })
   
-  temp_q3 <- eventReactive(input$submit,{
-    temp_q3_d() %>%
+  temp_q4 <- eventReactive(input$submit,{
+    temp_q4_d() %>%
     mutate(anomaly = factor(anomaly)) %>%
     mutate(anomaly = recode(anomaly, No = "N", Yes = "Y"))  %>%
-    rename(Flag_QC3 = anomaly) })
+    rename(Flag_QC4 = anomaly) })
   
    
   ### Filter all delete rows
-  temp_q4_b <-  reactive( {
-    temp_q4() %>%
-     filter(Flag_QC4 == "Y")})  
-
-  temp_q1_b <- reactive({
+  temp_q1_b <-  reactive( {
     temp_q1() %>%
-      filter(Flag_QC1 == "Y")})
-      
-  temp_q2_b <- reactive({ 
+     filter(Flag_QC1 == "Y")})  
+
+  temp_q2_b <- reactive({
     temp_q2() %>%
-    filter(Flag_QC2 == "Y") })
-  
+      filter(Flag_QC2 == "Y")})
+      
   temp_q3_b <- reactive({ 
     temp_q3() %>%
     filter(Flag_QC3 == "Y") })
   
+  temp_q4_b <- reactive({ 
+    temp_q4() %>%
+    filter(Flag_QC4 == "Y") })
+  
+  
+  ###############################################################
+  ## Table -------------------------------------------------------
+  ################################################################
+  
+  # Describes the amount of data removed 
+  
+  output$vals_removed <- renderTable({
+    
+    # Make table
+    # Counts the number of rows of data being flagged
+    vals_removed <- temp_q4() %>%
+      group_by(station) %>%
+      summarize(Init = n(),
+                QC1 = sum(Flag_QC1 =="Y"),
+                QC2 = sum(Flag_QC2 == "Y"),
+                QC3 = sum(Flag_QC3 == "Y", na.rm = TRUE),
+                QC4 = sum(Flag_QC4 == "Y"),
+                Remaining = sum(Flag_QC1=="N" & Flag_QC2 == "N" & Flag_QC3 =="N" & Flag_QC4 =="N", na.rm = TRUE),
+                Prop_remaining = round(Remaining/Init*100,1)) %>%
+      arrange(Prop_remaining)
+    
+  })
+  
+  
   ###################################################################
-  ## Plot 1: PreQC ------------------------------------------------------------ 
+  ## Plot 1: PreQC ---------------------------------------------------
   ##################################################################
  
+  # Plot of all data and flags 
+  
   output$preQC <- renderPlot({
     
     # This little if section somehow makes the time datetime plot. Without this it breaks!
@@ -193,15 +232,14 @@ server <- function(input, output) {
     
     # Plot data
     ggplot() +
-      geom_point(data = temp_q3(), aes(datetime, Temp), col = "lightsteelblue3") +
-      geom_point(data = temp_q1_b(), aes(datetime, Temp), color = "goldenrod2", size = 2) +
-      geom_point(data = temp_q2_b(), aes(datetime, Temp), color = "indianred3", size = 2) +
-      geom_point(data = temp_q3_b(), aes(datetime, Temp), color = "springgreen4", size = 2) +
-      geom_point(data = temp_q4_b(), aes(datetime, Temp), color = "cyan3", size = 2) +
+      geom_point(data = temp_q4(), aes(datetime, Temp), col = "lightsteelblue3") +
+      geom_point(data = temp_q1_b(), aes(datetime, Temp), color = "cyan3", size = 2) +
+      geom_point(data = temp_q2_b(), aes(datetime, Temp), color = "goldenrod2", size = 2) +
+      geom_point(data = temp_q3_b(), aes(datetime, Temp), color = "indianred3", size = 2) +
+      geom_point(data = temp_q4_b(), aes(datetime, Temp), color = "springgreen4", size = 2) +
       coord_cartesian(xlim = ranges$x, ylim = ranges$y, expand = TRUE) +
-      #annotation_custom(grob = grid::textGrob(paste(deleted_total, "deleted values")),
-      #                  xmin = -Inf, xmax = Inf, ymin = max(temp_sta$Temp), ymax = max(temp_sta$Temp)) +
-      scale_x_datetime() + #ylim(0,30) +
+      labs(y = "Temp (deg C)") +
+      scale_x_datetime() + 
       theme_bw() +
       theme(axis.title = element_text(size = 16),
             axis.text = element_text(size = 16),
@@ -227,62 +265,32 @@ server <- function(input, output) {
   ## Plot2: PostQC Final ---------------------------------------------------
   ##############################################################################
   
+  # Plot of data within temperature limits - makes it easier to see if there are really high or low values
+  
   output$postQC_F <- renderPlot({
-    # This will initiate the submit button
-    input$submit 
+   
+    # Plot within temperature limits 
+    temp_q4_plot <- temp_q4() %>%
+      filter(Flag_QC1 == "N")
     
-    ############################ TEMPORARY ########################
-    temp_q4_mod <- temp_q3() %>%
-      filter(Flag_QC4 == "N")
-    ###############################################################
-    
-    ####################### EDITED ##############################################
-    temp_q3_plot <- left_join(temp_q3_b(), temp_q4_mod) %>%
-      filter(Flag_QC4 == "N")
-    ###############################################################
+    temp_q4_b_plot <- temp_q4_plot %>%
+      filter(Flag_QC4 == "Y")
     
     # Plot the data ########################################################################################
-    # Each displays the deleted data in a different color, along with the "cleaned" data. 
-    # Annotation custom displays the deleted rows in the center of the plot
+    # Each geom_point() plots a different flag
     ggplot() +
-      geom_point(data = temp_q4_mod, aes(datetime, Temp), col = "lightsteelblue3") +
-      geom_point(data = temp_q1_b(), aes(datetime, Temp), color = "goldenrod2", size = 2) +
-      geom_point(data = temp_q2_b(), aes(datetime, Temp), color = "indianred3", size = 2) +
-      geom_point(data = temp_q3_plot, aes(datetime, Temp), color = "springgreen4", size = 2) +
-      #coord_cartesian(xlim = ranges$x, ylim = ranges$y, expand = FALSE) +
-      #annotation_custom(grob = grid::textGrob(paste(deleted_total, "deleted values")),
-      #                  xmin = -Inf, xmax = Inf, ymin = max(temp_sta$Temp), ymax = max(temp_sta$Temp)) +
-      scale_x_datetime() + #ylim(0,30) +
+      geom_point(data = temp_q4_plot, aes(datetime, Temp), col = "lightsteelblue3") +
+      geom_point(data = temp_q2_b(), aes(datetime, Temp), color = "goldenrod2", size = 2) +
+      geom_point(data = temp_q3_b(), aes(datetime, Temp), color = "indianred3", size = 2) +
+      geom_point(data = temp_q4_b_plot, aes(datetime, Temp), color = "springgreen4", size = 2) +
+      labs(y = "Temp (deg C)") +
+      scale_x_datetime() +
       theme_bw() +
       theme(axis.title = element_text(size = 16),
             axis.text = element_text(size = 16),
             axis.text.x = element_text(angle = 90, hjust = 1))
-    
   })
   
-  
-  
-  ###############################################################
-  ## Table ---------------------------------------------------------------- 
-  ################################################################
-  
-  output$vals_removed <- renderTable({
-    # This will initiate the submit button
-    input$submit 
-  
-    ### Make table
-    vals_removed <- temp_q3() %>%
-      group_by(station) %>%
-      summarize(Init = n(),
-                QC1 = sum(Flag_QC1 =="Y"),
-                QC2 = sum(Flag_QC2 == "Y"),
-                QC3 = sum(Flag_QC3 == "Y", na.rm = TRUE),
-                QC4 = sum(Flag_QC4 == "Y"),
-                Remaining = sum(Flag_QC1=="N" & Flag_QC2 == "N" & Flag_QC3 =="N" & Flag_QC4 =="N", na.rm = TRUE),
-                Prop_remaining = round(Remaining/Init*100,1)) %>%
-      arrange(Prop_remaining)
-    
-  })
 }
 
 # Run the application 
