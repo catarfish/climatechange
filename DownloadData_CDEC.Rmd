@@ -59,7 +59,9 @@ sta_all<-c("BAC", "BET", "BLP", "CSE", "CYG", "FAL", "FLT", "FRK",
           "ANH", "BDL", "BLL", "DV7", "GLN", "MAL", "MSD", "MTB", "NSL", "VER", "RPN", "RVB", "SJL", "SRH",
           "BKS", "CLC", "CPP", "DV7", "DYR", "HBP")
 # Filter out list of unique stations (some are in there multiple times)
-sta <- unique(sta_all)
+sta <- sort(unique(sta_all))
+sta
+
 
 
 ### First download dataset info ---------------------------------------------
@@ -84,12 +86,13 @@ rm(sensordataset)
 cdec_temp <- cdec_datasets_df %>% 
   filter(sensor_number == 25 | sensor_number == 146) %>% 
   filter(duration !="daily") %>%
-  arrange(station)
-
+  arrange(station)%>%
+  mutate(days = end-start)
 
 ```
 
 Download Raw Data from CDEC
+These are at Pacific Standard Time 
 Split up into 4 sets of stations: 
 * Event/Fahrenheit
 * Event/Celsius
@@ -134,10 +137,17 @@ Temp_Event_F_Raw <- lapply(sta_Ev_F,
                               end_date = end)
                  })
 
-Temp_E_F_Raw_df <- bind_rows(Temp_Event_F_Raw) # bind rows into data frame
-write_csv(Temp_E_F_Raw_df, "TempData/Raw/Temp_E_F_raw.csv") #write data
-saveRDS(Temp_E_F_Raw_df, "TempData/Raw/Temp_E_F_raw.rds") #write rds
+Temp_Event_OAD <- cdec_query(station = "OAD",
+                              sensor_num = sensor1,
+                              dur_code = "E",
+                              start_date = "1986-01-01",
+                              end_date = "2019-12-31")
 
+Temp_E_F_Raw_df <- bind_rows(Temp_Event_F_Raw) # bind rows into data frame
+write_csv(Temp_E_F_Raw_df, "Tempdata/Raw/Temp_E_F_raw.csv") #write data
+saveRDS(Temp_E_F_Raw_df, "Tempdata/Raw/Temp_E_F_raw.rds") #write rds
+
+a <- Temp_E_F_Raw_df %>%filter(location_id == "OAD")
 
 ###################################### Event Data - Celsius ##############################
 
@@ -158,8 +168,8 @@ Temp_Event_C_Raw <- lapply(sta_Ev_C,
 
 Temp_E_C_Raw_df <- bind_rows(Temp_Event_C_Raw) # bind into df
 
-write_csv(Temp_E_C_Raw_df, "TempData/Raw/Temp_E_C_raw.csv") #write data
-saveRDS(Temp_E_C_Raw_df, "TempData/Raw/Temp_E_C_raw.rds") #write rds
+write_csv(Temp_E_C_Raw_df, "Tempdata/Raw/Temp_E_C_raw.csv") #write data
+saveRDS(Temp_E_C_Raw_df, "Tempdata/Raw/Temp_E_C_raw.rds") #write rds
 
 
 ###################################### Hourly Data - Fahrenheit ##############################
@@ -184,8 +194,8 @@ Temp_Hourly_F_Raw <- lapply(sta_H_F,
                  })
 
 Temp_H_F_Raw_df <- bind_rows(Temp_Hourly_F_Raw) # bind into df
-write_csv(Temp_H_F_Raw_df, "TempData/Raw/Temp_H_F_raw.csv") #write data
-saveRDS(Temp_H_F_Raw_df, "TempData/Raw/Temp_H_F_raw.rds") #write rds
+write_csv(Temp_H_F_Raw_df, "Tempdata/Raw/Temp_H_F_raw.csv") #write data
+saveRDS(Temp_H_F_Raw_df, "Tempdata/Raw/Temp_H_F_raw.rds") #write rds
 
 
 ###################################### Hourly Data - Celsius ##############################
@@ -207,8 +217,8 @@ Temp_Hourly_C_Raw <- lapply(sta_H_C,
                  })
 
 Temp_H_C_Raw_df <- bind_rows(Temp_Hourly_C_Raw) # bind into df
-write_csv(Temp_H_C_Raw_df, "TempData/Raw/Temp_H_C_raw.csv") #write data
-saveRDS(Temp_H_C_Raw_df, "TempData/Raw/Temp_H_C_raw.rds") #write rds
+write_csv(Temp_H_C_Raw_df, "Tempdata/Raw/Temp_H_C_raw.csv") #write data
+saveRDS(Temp_H_C_Raw_df, "Tempdata/Raw/Temp_H_C_raw.rds") #write rds
 
 # Remove some files
 rm(Temp_Event_F_Raw, Temp_Event_C_Raw, Temp_Hourly_C_Raw, Temp_Hourly_F_Raw)
@@ -240,10 +250,15 @@ rm(Temp_F, Temp_FtoC, Temp_C)
 
 # Merge converted temp data frames together 
 Temp_all_std <- rbind(Temp_C_1, Temp_C_2)
-saveRDS(Temp_all_std, "TempData/Std/Temp_all_std.rds") # Write rds
-write_csv(Temp_all_std, "Tempdata/std/Temp_all_std.csv") # write csv
+saveRDS(Temp_all_std, "Tempdata/Std/Temp_all_std.rds") # Write rds
+write_csv(Temp_all_std, "Tempdata/Std/Temp_all_std.csv") # write csv
 
 
+```
+
+
+```{r}
+Temp_all_std <- read_rds("Tempdata/Std/Temp_all_std.rds")
 ```
 
 
@@ -257,7 +272,7 @@ for (name in levels(Temp_all_std$station)) {
   #Subset the data station
   tmp=subset(Temp_all_std,station==name)
   #Create a new filename for each station. Designate the folder you want the files in.
-  fn=paste('TempData/Std/Individual/',name, "_std_sin.csv", sep="")
+  fn=paste('Tempdata/Std/Individual/',name, "_std_sin.csv", sep="")
   #Save the CSV file for each station
   write_csv(tmp,fn)
 }
@@ -266,41 +281,38 @@ for (name in levels(Temp_all_std$station)) {
 Convert data to hourly
 
 ```{r Hourly}
+str(Temp_all_std)
 
 # Add some columns to sort by date
 Temp_all_std$station <- as.factor(Temp_all_std$station)
-Temp_all_std$date <- as.Date(Temp_all_std$datetime, format = "%Y-%m-%d")
+Temp_all_std$date <- date(Temp_all_std$datetime)
 Temp_all_std$year <- year(Temp_all_std$datetime)
-Temp_all_std$yrMon <- format(as.Date(Temp_all_std$date), "%y-%m")
-#Temp_all_std$ymon1 <- as.Date(paste(Temp_all_std$yrMon, "-01", sep=""))
+Temp_all_std$month <- month(Temp_all_std$datetime)
 Temp_all_std$hour <- hour(Temp_all_std$datetime)
 Temp_all_std$minute <- minute(Temp_all_std$datetime)
 
 # Remove any row where Temp=NA
 temp_H_0 <- Temp_all_std %>%
-  filter(!is.na(Temp))
+  filter(!is.na(Temp)) %>%
+  filter(!is.na(datetime)) # need this for anomalize later
 
 # Convert temperature data to hourly
 temp_H <- temp_H_0 %>%
   group_by(station, date, hour) %>% #group (calculations) by these vars
   arrange(station, date, hour, minute) %>% #arrange in order of these vars to visualize duplication
-  slice(1) %>% #subset only the first value for each station, date, hour group.
+  slice(1) %>% #keep only the first value for each station, date, hour group so 1 value/hour
   ungroup()
 
+
 # Check that they are all good!
-# Just change the name of the file. 
 check <- temp_H %>%
   group_by(station, date, hour)%>%
   summarize(vals = n())
 which(check$vals >1) # this should be 0
 
-# remove data not needed
-rm(temp_all, temp_H_0, check)
-gc()
-
 # Write data
-saveRDS(temp_H, "TempData/Hourly/Temp_all_H.rds") # Write rds
-write_csv(temp_H, "TempData/Hourly/Temp_all_H.csv") # write csv
+saveRDS(temp_H, "Tempdata/Hourly/Temp_all_H.rds") # Write rds
+write_csv(temp_H, "Tempdata/Hourly/Temp_all_H.csv") # write csv
 
 ```
 
