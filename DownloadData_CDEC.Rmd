@@ -58,11 +58,9 @@ sta_all<-c("BAC", "BET", "BLP", "CSE", "CYG", "FAL", "FLT", "FRK",
           "OBI", "JER", "KA0", "PCT", "PTS", "RIV", "ROR", "SAL", "STI", "UNI", "VIC", "VOL", "MRZ",
           "ANH", "BDL", "BLL", "DV7", "GLN", "MAL", "MSD", "MTB", "NSL", "VER", "RPN", "RVB", "SJL", "SRH",
           "BKS", "CLC", "CPP", "DV7", "DYR", "HBP")
+
 # Filter out list of unique stations (some are in there multiple times)
 sta <- sort(unique(sta_all))
-sta
-
-
 
 ### First download dataset info ---------------------------------------------
 
@@ -137,17 +135,9 @@ Temp_Event_F_Raw <- lapply(sta_Ev_F,
                               end_date = end)
                  })
 
-Temp_Event_OAD <- cdec_query(station = "OAD",
-                              sensor_num = sensor1,
-                              dur_code = "E",
-                              start_date = "1986-01-01",
-                              end_date = "2019-12-31")
-
 Temp_E_F_Raw_df <- bind_rows(Temp_Event_F_Raw) # bind rows into data frame
 write_csv(Temp_E_F_Raw_df, "Tempdata/Raw/Temp_E_F_raw.csv") #write data
 saveRDS(Temp_E_F_Raw_df, "Tempdata/Raw/Temp_E_F_raw.rds") #write rds
-
-a <- Temp_E_F_Raw_df %>%filter(location_id == "OAD")
 
 ###################################### Event Data - Celsius ##############################
 
@@ -257,11 +247,6 @@ write_csv(Temp_all_std, "Tempdata/Std/Temp_all_std.csv") # write csv
 ```
 
 
-```{r}
-Temp_all_std <- read_rds("Tempdata/Std/Temp_all_std.rds")
-```
-
-
 Write individual files for each station
 CSV - includes event and hourly data all combined
 
@@ -281,9 +266,10 @@ for (name in levels(Temp_all_std$station)) {
 Convert data to hourly
 
 ```{r Hourly}
-str(Temp_all_std)
 
-# Add some columns to sort by date
+#Temp_all_std <- readRDS("Tempdata/Std/Temp_all_std.rds")
+
+# Add some columns to sort by date/time object types
 Temp_all_std$station <- as.factor(Temp_all_std$station)
 Temp_all_std$date <- date(Temp_all_std$datetime)
 Temp_all_std$year <- year(Temp_all_std$datetime)
@@ -291,10 +277,10 @@ Temp_all_std$month <- month(Temp_all_std$datetime)
 Temp_all_std$hour <- hour(Temp_all_std$datetime)
 Temp_all_std$minute <- minute(Temp_all_std$datetime)
 
-# Remove any row where Temp=NA
+# Remove any row where Temp = NA or datetime = NA
 temp_H_0 <- Temp_all_std %>%
   filter(!is.na(Temp)) %>%
-  filter(!is.na(datetime)) # need this for anomalize later
+  filter(!is.na(datetime)) # need this for anomalize later or it won't run
 
 # Convert temperature data to hourly
 temp_H <- temp_H_0 %>%
@@ -302,7 +288,6 @@ temp_H <- temp_H_0 %>%
   arrange(station, date, hour, minute) %>% #arrange in order of these vars to visualize duplication
   slice(1) %>% #keep only the first value for each station, date, hour group so 1 value/hour
   ungroup()
-
 
 # Check that they are all good!
 check <- temp_H %>%
