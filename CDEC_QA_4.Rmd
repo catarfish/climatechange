@@ -24,43 +24,82 @@ library(readr)
 library(lubridate)
 library(TTR) # rate of change
 library(caTools) # rate of change
-library(ggiraph)
 
-setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/")
+#setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/")
 #### Read files ###
-temp_H_0 <- readRDS("climatechange/WaterTemp/data/Temp_all_H.rds")
+temp_H_0 <- readRDS("WaterTemp/data/Temp_all_H.rds")
 
 # Filter out stations that are not contiguous.
 temp_H <- temp_H_0 %>% 
-  filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY"))
+  filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
+
+# Look at data
+str(temp_H)
+head(temp_H)
 
 # Remove unnecessaries
 rm(temp_H_0)
 ```
 
-## QA1) Remove days with less than 20 values 
+
+## Get some info about the stations in this current dataset 
+```{r StationInfo}
+latlons <- read_csv("latlonsTomerge.csv")
+latlons2 <- select(latlons, c(station, Latitude, Longitude))
+latlons2$station <- as.factor(latlons2$station)
+
+temp_info <- temp_H %>%
+  group_by(station) %>%
+  arrange(station, datetime) %>%
+  summarize(Start = first(datetime),
+         Last = last(datetime),
+         Duration = round(Last - Start),
+         StartYear = year(Start),
+         nObs = n())
+
+cdec_latlon <- left_join(temp_info, latlons2, by = "station") %>%
+  arrange(station, Start)
+
+# Optional: Write file to make GIS Map
+# write_csv(cdec_latlon, "CDECStationsLatLonStart.csv")
+```
+
+
+## QC1) Flag data outside of reasonable temperature range (1-40)
+```{r 0-40, message = FALSE}
+
+# Data including flags
+temp_q1 <- temp_H %>% mutate(Flag_QC1 = ifelse(Temp<1 | Temp>40, "Y", "N")) 
+
+# Flagged values only
+temp_q1_b <- temp_q1 %>%
+  filter(Flag_QC1 == "Y")
+
+```
+
+## QC2) Missing values: Flag days with less than n(20) values 
 
 1. Count the number of rows per station, date group. (There should only be one row per date)
-2. To be deleted: Filter out dates for which there are less than 20 values (out of 24).
-3. Use antijoin to remove the deleted dates from original data frame.
+2. Flag days where there are less than 20 values (out of 24).
+3. Use leftjoin to add flags to the original data.
 
 ```{r Missing Values, message = FALSE}
 
 # This data frame contains all the dates with less than 20 values. 
-temp_q1_a <- temp_H %>%
+temp_q2_a <- temp_q1 %>%
   group_by(station, date) %>%
   arrange(station, date, hour) %>%
-  summarize(total = n()) %>%
-  mutate(Flag_QC1 = ifelse(total < 20, "Y", "N"))
+  summarise(total = n()) %>%
+  mutate(Flag_QC2 = ifelse(total < 20, "Y", "N"))
 
-# Values that are flagged
-temp_q1_b <- temp_q1_a %>%
-  filter(Flag_QC1 == "Y")
+# Flagged values
+temp_q2_b <- temp_q2_a %>%
+  filter(Flag_QC2 == "Y")
 
 #Join original dataframe with flagged values based on values NOT in common. 
 #based on station and date
-temp_q1 <- temp_H %>%
-  left_join(temp_q1_a, by = c("station", "date"))
+temp_q2 <- temp_q1 %>%
+  left_join(temp_q2_a, by = c("station", "date"))
 
 # Remove unnecessaries
 #rm(temp_q1_a)
@@ -68,18 +107,17 @@ gc()
 
 ```
 
-## QA2) Remove if there are more than 12 repeating values in a row
+## QC3) Flag if there are 18+ repeating values in a row
 
-With help from Michael K!
-
+With help from Michael K
 1. Create new columns indicating whether the temperature at x hour is the same as that of x-1 hours.
 2. Take a cumulative sum of all the rows where temperatures are different
 3. Group by the sum and count up the number of rows where the temperature is the same.
 4. Flag the rows where number of repeated values is above our cut-off
-5. Filter out rows that we flagged
-
 
 ```{r repeating values, message = FALSE}
+
+#########################################################
 # Significant help from Michael Koohafkan and Rosie Hartman
 
 # Function to determine whether values are repeating by each station
@@ -99,22 +137,16 @@ repeating_vals = function(df, x){
     mutate(Flag_repeats = ifelse(flag > x, "Y", "N"))
   return(df)
 }
-
-
-### Run function --------------------------------------------------
-temp_q1$Temp <- as.numeric(temp_q1$Temp)
+###########################################################
 
 # Run function repeating values and get rid of the columns we don't need
-temp_q2 <- repeating_vals(df = temp_q1, x = 10) %>%
+temp_q3 <- repeating_vals(df = temp_q2, x = 18) %>%
   select(-flag, -issame, -same) %>%
-  rename(Flag_QC2 = Flag_repeats)
+  rename(Flag_QC3 = Flag_repeats) 
 
-###-------------------------------------------------------------
-
-
-# Create a dataframe of all the flagged rows
-temp_q2_b <- temp_q2 %>%
-  filter(Flag_QC2 == "Y")
+# Flagged values
+temp_q3_b <- temp_q3 %>%
+  filter(Flag_QC3 == "Y")
 
 # Remove unnecessaries
 #rm(temp_q2_a, temp_q1)
@@ -122,345 +154,154 @@ temp_q2_b <- temp_q2 %>%
 
 ```
 
-### QA3: Rate of change and Spike test
 
-Unfortunately, this method doesn't deal with groups of bad data (like when the sonde has been out of the water for a few hours). It gets rid of the first and last "bad" dat ponit, but not the ones in between. We may need to group the data based on the bad data points and use a cumsum to identify the groups. Then compare group mean?
-
-```{r GAM}
-library(mgcv)
-
-# test set
-temp_q3_test <- temp_q2 %>% filter(station %in% c("ANC" )) %>%
-  filter(Temp <40 & Temp >1)
-
-
-head(temp_q3_test)
-
-# Plot data within range
-ggplot(temp_q3_test, aes(x = datetime, y = Temp)) + geom_point(size = 5) +theme_bw()
-
-# Standardize datetime
-temp_q3_test$datetime_n <- as.numeric(temp_q3_test$datetime)
-temp_q3_t <- temp_q3_test %>%
-  filter(!is.na(datetime_n)) %>%
-  group_by(station) %>%
-  mutate(datetime_s = (datetime_n - mean(datetime_n)) / sd(datetime_n) )
-head(temp_q3_t)
-ggplot(temp_q3_t, aes(x = datetime_s, y = Temp)) + geom_point(size = 5)
-
-# Run GAM
-gam1 <- gam(Temp ~ s(datetime_s), data = temp_q3_t, method = "REML")
-gam2 <- gam(Temp ~s(datetime_s), data = temp_q3_t)
-
-# Look at results
-summary(gam1)
-plot(gam1, pages = 1, all.terms = TRUE)
-
-summary(gam2)
-plot(gam2)
-
-# Residuals
-gam1$residuals <- residuals(gam1)
-plot(gam1$residuals)
-par(mfrow = c(2,2))
-gam.check(gam1)
-
-
-#-----Multiple Stations-----------------------------------------------------
-# test set
-temp_q3_test2 <- temp_q2 %>% filter(station %in% c("LIS", "DWS", "RYI")) %>% filter(Temp>1 & Temp < 40)
-
-# Plot data within range
-ggplot(temp_q3_test2, aes(x = datetime, y = Temp)) + geom_point(size = 2) +theme_bw() + 
-  facet_wrap(~station, scales = "free")
-
-# Standardize datetime
-temp_q3_test2$datetime_n <- as.numeric(temp_q3_test2$datetime)
-temp_q3_t2 <- temp_q3_test2 %>%
-  filter(!is.na(datetime_n)) %>%
-  group_by(station) %>%
-  mutate(datetime_s = (datetime_n - mean(datetime_n)) / sd(datetime_n) )
-head(temp_q3_t2)
-ggplot(temp_q3_t2, aes(x = datetime_s, y = Temp)) + geom_point(size = 5) + facet_wrap(~station, scales = "free")
-
-# Run GAM
-gam3 <- gam(Temp ~ s(datetime_s, by = station), data = temp_q3_t2, method = "REML")
-gam4 <- gam(Temp ~s(datetime_s, k = 20), data = temp_q3_t2)
-
-# Look at results
-summary(gam3)
-plot(gam3, pages = 1, all.terms = TRUE)
-
-summary(gam4)
-plot(gam4)
-
-# Residuals
-gam3$residuals <- residuals(gam3)
-plot(gam3, pages = 1, all.terms = TRUE, residuals = TRUE, pch = 1, cex = 1)
-
-gam4$residuals <- residuals(gam4)
-plot(gam4, pages = 1, all.terms = TRUE, residuals = TRUE, pch = 1, cex = 1)
-
-par(mfrow = c(2,2))
-gam.check(gam3)
-
-par(mfrow = c(2,2))
-gam.check(gam4)
-```
-
-
+## QC4) Use the anomalize package to flag anomalies
+* Twitter + GESD is for more for highly seasonal data (however, GESD is extremely slow because it is iterative)
+* STL + IQR if seasonality is not a major factor
+* Trend period depends on personal knowledge of data
 
 ```{r anomalize}
-library(tidyverse)
 library(anomalize)
 library(tibbletime)
+  
+# Subset data that can use this method (some data have too short of a period)
+# temp_test <- temp_H %>% filter(station %in% c("OAD"))
+# Convert data frame to table 
 
-temp_q3_t <- temp_q2 %>% filter(!is.na(datetime)) %>% filter(station %in% c("LIS", "RYI", "DWS"))
-temp_q = as_tbl_time(temp_q3_t, index = datetime)
+temp_q4_a <- as_tbl_time(temp_q3, index = datetime)
 
-temp_q_a <- temp_q %>%
-    # Data Manipulation / Anomaly Detection
-    filter(Temp>0 & Temp < 40) %>%
+# Anomaly Detection
+temp_q4_c <- temp_q4_a %>%
     group_by(station) %>%
-    time_decompose(Temp, method = "twitter") %>%
+    time_decompose(Temp, method = "stl", trend = "3 months") %>%
     anomalize(remainder, method = "iqr") %>%
-    time_recompose()
-    # Anomaly Visualization
-    plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.25) 
-    #labs(title = "Did this work?", subtitle = "STL + IQR Methods")
+    time_recompose() %>% 
+    select(c(datetime, anomaly)) %>%
+    as_tibble() 
 
-    temp_q_a2 <- temp_q_a %>% select(c(datetime, station, anomaly))
-    temp_q_a2 <- as_tibble(temp_q_a2)
-temp_q3_merge <- inner_join(temp_q3_t, temp_q_a2, by = c("station", "datetime"))
+# Join "anomaly" with rest of the data
+temp_q4_d <- inner_join(temp_q3, temp_q4_c, by = c( "datetime", "station"))
 
-temp_q3_merge$anomaly <- as.factor(temp_q3_merge$anomaly)
-ggplot(temp_q3_merge, aes(x = datetime, y = Temp, col = anomaly)) + geom_point() + facet_wrap(~station, scales = "free") +
-   scale_colour_brewer(palette="Dark2")
-
-
-temp_q %>%
-    # Data Manipulation / Anomaly Detection
-    filter(station %in% c("LIS")) %>%
-    filter(Temp>0 & Temp < 40) %>%
-    time_decompose(Temp, method = "twitter") %>%
-    anomalize(remainder, method = "iqr") %>%
-    time_recompose() %>%
-    # Anomaly Visualization
-    plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.25) +
-    labs(title = "Did this work?", subtitle = "Twitter + IQR Methods") 
-
-temp_q %>%
-    # Data Manipulation / Anomaly Detection
-    filter(station %in% c("LIS")) %>%
-    filter(Temp>0 & Temp < 40) %>%
-    time_decompose(Temp, method = "twitter") %>%
-    anomalize(remainder, method = "gesd") %>%
-    time_recompose() %>%
-    # Anomaly Visualization
-    plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.25) +
-    labs(title = "Did this work?", subtitle = "Twitter + GESD Methods")
-
-a <- temp_q %>%
-    # Data Manipulation / Anomaly Detection
-    filter(station %in% c("LIS")) %>%
-    filter(Temp>0 & Temp < 40) %>%
-    time_decompose(Temp, method = "twitter") %>%
-    anomalize(remainder, method = "iqr") %>%
-    time_recompose()
-
+# Rename "anomaly" Flag_QC4 for consistency, change No to N and Yes to Y
+temp_q4 <- temp_q4_d %>%
+    mutate(anomaly = factor(anomaly)) %>%
+    mutate(anomaly = recode(anomaly, No = "N", Yes = "Y"))  %>%
+    rename(Flag_QC4 = anomaly)
+    
+# Flagged values
+temp_q4_b <- temp_q4 %>%
+    filter(Flag_QC4 == "Y")
 
 ```
 
+### QC5) Rate of change and Spike test
 
-
-
-
+Anomalize is pretty good, but there are a few single points here and there that don't get detected. 
+1. Define standard deviation threshold
+2. If difference between value and the value before it > threshold, it is flagged.
+3. If difference between value and the value before it > 5, it is flagged.
 
 ```{r Rate of Change}
 ### ---------------------------------------------
-# Q3: Temp - Temp-1
-# sdev_th: Determined threshold for too high of a rate of change (3 * SD(Temp) over 25 hours)
-# If Q3 > sdev_th, flag.
-# Additionally, if Q3 > 5 (5 degree change in 1 hour), flag. 
+# Q5: Temp - Temp-1
+# sdev_th: Determined threshold for too high of a rate of change (5 * SD(Temp) over 50 hours or 2 tidal cycles)
+# If Q5 > sdev_th, flag.
+# Additionally, if Q5 > 5 (5 degree change in 1 hour), flag. 
 
-temp_q3_a <- temp_q2 %>%
+temp_q5 <- temp_q4 %>%
   group_by(station) %>%
   arrange(station, datetime) %>%
-  mutate(QC3 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
-  mutate(sdev_th = 3 * runSD(Temp, 25))%>%
-   mutate(Flag_sdev = ifelse((QC3 > sdev_th | QC3 > 5), "Y", "N"))  %>%
-      mutate(Flag_sdev = replace(Flag_sdev, is.na(Flag_sdev), "N")) %>%
+  mutate(QC5 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
+  mutate(sdev_th = 5 * runSD(Temp, 50))%>%
+   mutate(Flag_QC5 = ifelse((QC5 > sdev_th | QC5 > 5), "Y", "N"))  %>%
+      mutate(Flag_QC5 = replace(Flag_QC5, is.na(Flag_QC5), "N")) %>%
+  select(-QC5)
   ungroup()
 
-# b <- temp_q3_a %>% filter(Flag_sdev == "Y")
-
-    # This would address situations in which there is a single point that is influencing
-    # sd calculation for later values - redo calculations based on unflagged data. Will need to edit
-    # variable names 
-    #
-# temp_q3_a_2 <- temp_q3_a %>%
-#   filter(Flag_QC3a == "N") %>%
-#   group_by(station) %>%
-#   arrange(station, datetime) %>%
-#   mutate(QC3 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
-#   mutate(sdev_th = 3 * runSD(Temp, 25))%>%
-#   mutate(Flag_sdev = ifelse((QC3 > sdev_th | QC3 > 5), "Y", "N"))  %>%
-#   mutate(Flag_sdev = replace(Flag_sdev, is.na(Flag_sdev), "N")) %>%
-#   ungroup()
-
-# Clean up original
-temp_q3_c <- temp_q3_a %>%
-  select(-c(QC3))
-
-# Cumsum every time there is a flagged value to separate data into different groups
-# each time there is a spike
-temp_q3_d = temp_q3_c %>%
-  mutate(Flag_spike = cumsum(Flag_sdev == "Y"))
-
-# Compare groups of values with each other 
-temp_q3_e <- temp_q3_d %>%
-  group_by(station, Flag_spike) %>%
-  summarize(tempi = first(Temp),
-         tempf = last(Temp),
-         sdev_thlast = round(last(sdev_th),3),
-         n = n()) %>%
-  mutate(tempfprev = lag(tempf, 1),
-         tempfprev2 = lag(tempf, 2),
-         tempinext = lead(tempi, 1),
-         temp_diff1 = abs(tempi - tempfprev),
-         temp_diff2 = abs(tempi - tempfprev2),
-         temp_diffnext = abs(tempinext-tempf),
-         sdev_thprev = lag(sdev_thlast, 1),
-         sdev_thprev2 = lag(sdev_thlast,2)) %>%
-  mutate(Flag_QC3 = ifelse((temp_diff1 > sdev_thprev & temp_diff2 > sdev_thprev2 & temp_diffnext > sdev_thlast) | temp_diff1 > 5, "Y", "N" ))
-
-# Merge summarized calculations/flags from e back in with rest of the data
-# Remove some rows
-temp_q3_f <- left_join(temp_q3_d, temp_q3_e, by = c("station", "Flag_spike"))%>%
-  select(-c(tempi:sdev_thprev2))
-
-# Use these if doing the temp_q3_a_2 flag
-# temp_q3_f_merge <- temp_q3_f %>%select(station, datetime, Flag_spike, Flag_QC3)
-#                                            
-# temp_q3 <- left_join(temp_q3_a, temp_q3_f_merge) 
-#       mutate(Flag_QC3 = replace(Flag_QC3, Flag_QC3a == "Y", "Y"))
-      
-# Replace NAs with Flag of "N"
-temp_q3 <- temp_q3_f %>%
-             mutate(Flag_QC3 = replace(Flag_QC3, is.na(Flag_QC3), "N"))    
-
-# Filter out Flagged values
-temp_q3_b <- temp_q3 %>%
-  filter(Flag_QC3 == "Y")
-
-############ test
-      
-statest <- c("ANC", "BET", "BAC", "VOL")
-testq3 <- temp_q3 %>%
-  filter(station %in% statest)
-      
-ggplot(testq3, aes(x = datetime, y = Temp, col = Flag_QC3) ) +
-  geom_point() +
-  #scale_color_discrete(values = c("green", "blue")) +
-  facet_wrap(~station, scales = "free") 
-
-#########################################################
-
+# Flagged values
+temp_q5_b <- temp_q5 %>%
+  filter(Flag_QC5 == "Y")
 
 #rm(temp_q3_a)
 
 ```
 
+## Filter final 
 
-## QA4): Remove anything outside of reasonable temperature range (0-40)
-```{r 0-40, message = FALSE}
-temp_q4 <- temp_q3%>%
-mutate(Flag_QC4 = ifelse(Temp<0 | Temp>40, "Y", "N"))
+```{r final dataset}
+# Combine Flags 
+temp_flags <- temp_q5 %>%
+  ungroup() %>%
+  mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5))
+head(temp_flags)
 
-############TEMPORARY ONLY##########
-
-temp_q4d <- temp_q2%>%
-  filter(Temp>0 & Temp<40)
-
-```
-
-
-## Calculating temperature differences 
-
-```{r Temp differences}
-Tdiffs_all <- temp_q4d %>%
-  group_by(station, date)%>%
-  arrange(datetime)%>%
-  mutate(Tdiff = Temp - lag(Temp, 1)) %>%
-  mutate(large = ifelse(Tdiff>5, "Y", "N")) 
-
-Tdiff_distrib <- Tdiffs_all %>%
-  group_by(station) %>%
-  summarize(mean.tdiff = mean(Tdiff, na.rm = TRUE),
-            max.tdiff = max(Tdiff, na.rm = TRUE),
-            n.large = sum(large == "Y", na.rm = TRUE),
-            n = n()) %>%
-  mutate(percent.large = n.large/n * 100)
-
-ggplot(Tdiffs_all) +
-  geom_boxplot(aes(x = station, y =Tdiff))
-
-ggplot(Tdiff_distrib, aes(x = station, y = percent.large)) + 
-  geom_point()
+temp_final <- temp_flags %>%
+  filter(grepl("N,N,N,N,N", AllFlags))
 
 ```
-
-
-## How much data are being removed?
-```{r Data removal}
-
-removed_all <- temp_q4 %>%
-  summarize(Init = n(),
-            QC1 = sum(Flag_QC1=="Y"),
-            QC2 = sum(Flag_QC2_b == "Y"),
-            QC3 = sum(Flag_QC3 == "Y", na.rm = TRUE),
-            QC4 = sum(Flag_QC4 == "Y"),
-            Remaining = sum(Flag_QC1=="N" & Flag_QC2_b == "N" & Flag_QC3 =="N" & Flag_QC4 =="N", na.rm = TRUE),
-            Prop = round(Remaining/Init*100,1))
-
-
-removed_sta <- temp_q4 %>%
-  group_by(station) %>%
-  summarize(Init = n(),
-            QC1 = sum(Flag_QC1=="Y"),
-            QC2 = sum(Flag_QC2_b == "Y"),
-            QC3 = sum(Flag_QC3 == "Y", na.rm = TRUE),
-            QC4 = sum(Flag_QC4 == "Y"),
-            Remaining = sum(Flag_QC1=="N" & Flag_QC2_b == "N" & Flag_QC3 =="N" & Flag_QC4 =="N", na.rm = TRUE),
-            Prop = round(Remaining/Init*100,1)) %>%
-  arrange(Prop)
-
-a <- as.list(removed_sta)
-```
-
 
 ## Write files
 
 ```{r WriteFile, message = FALSE}
-library(readr)
-
-saveRDS(temp_q4, ".rds")
-write_csv(temp_q4, "QC/temp_all_qc.csv")
+saveRDS(temp_flags, "TempData/QC/Temp_flagged.rds")
+write_csv(temp_flags, "TempData/QC/Temp_flagged.csv")
 
 ### Individual files to csv
-
 # write each file as a csv
-allsta_q5$station <- as.factor(allsta_q5$station) # need to factorize the "stations"
+temp_flags$station <- as.factor(temp_flags$station) # need to factorize the "stations"
 #Get the list of unique MP names
-for (name in levels(allsta_q5$station)) {
+for (name in levels(temp_flags$station)) {
   #Subset the data station
-  tmp=subset(allsta_q5,station==name)
+  tmp=subset(temp_flags,station==name)
   #Create a new filename for each station. Designate the folder you want the files in.
-  fn=paste('station_files/stations_qa/postoutlier/',name, "_q5.csv", sep="")
+  fn=paste('TempData/QC/Individual/Flagged/',name, "_flagged.csv", sep="")
   #Save the CSV file for each station
   write_csv(tmp,fn)
 }
 
+
+saveRDS(temp_final, "TempData/QC/Temp_filtered.rds")
+write_csv(temp_flags, "TempData/QC/Temp_filtered.csv")
+
+### Individual files to csv
+# write each file as a csv
+temp_final$station <- as.factor(temp_final$station) # need to factorize the "stations"
+#Get the list of unique MP names
+for (name in levels(temp_final$station)) {
+  #Subset the data station
+  tmp=subset(temp_final,station==name)
+  #Create a new filename for each station. Designate the folder you want the files in.
+  fn=paste('TempData/QC/Individual/Filtered/',name, "_qc.csv", sep="")
+  #Save the CSV file for each station
+  write_csv(tmp,fn)
+}
 ```
 
+
+## How much data are being removed?
+
+```{r Data removal}
+# By station 
+(Removed_station <- temp_flags %>%
+  group_by(station) %>%
+  summarize(Init = n(),
+            QC1 = sum(Flag_QC1=="Y"),
+            QC2 = sum(Flag_QC2 == "Y"),
+            QC3 = sum(Flag_QC3 == "Y"),
+            QC4 = sum(Flag_QC4 == "Y"),
+            QC5 = sum(Flag_QC5 == "Y"),
+            QCTot = sum(grepl("Y",AllFlags)),
+            Pct_Removed_QC1 = round(QC1/Init*100,1),
+            Pct_Removed_QC2 = round(QC2/Init*100,1),
+            Pct_Removed_QC3 = round(QC3/Init*100,1),
+            Pct_Removed_QC4 = round(QC4/Init*100,1),
+            Pct_Removed_QC5 = round(QC5/Init*100,1),
+            Pct_Removed_Total = round(QCTot/Init * 100,1) ))
+
+# Overall dataset
+Flags <- temp_flags %>%
+  filter(grepl("Y", AnyFlag))
+print(paste0(round(nrow(Flags)/nrow(temp_q5)*100,2), "% flagged"))
+
+```
 
