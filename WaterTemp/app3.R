@@ -42,20 +42,23 @@ repeating_vals = function(df, x){
 
 ui <- fluidPage(
   
+  
   # Application title
   titlePanel("Water Temperature Synthesis QC App"),
   
   h4("Alter the inputs on the left sidebar to edit the data"),
-  
+
   # Sidebar with a slider input for number of bins
   sidebarLayout(
     position = "left",
     sidebarPanel(
+      
+      
       h3("Filters"),
       h4("Station and Date"),
       uiOutput("station_selector"), # See station_selector in server section
       dateRangeInput("daterange", "Date Range:",
-                     start = "2010-01-01", end = "2018-01-01", min = "1980-01-01", startview = "decade"),
+                     start = "1986-01-01", end = "2019-12-31", min = "1980-01-01", startview = "decade"),
       h4("1. Temperature cutoffs"),
       sliderInput("temprange",
                   "Temperature Cutoffs:",
@@ -79,34 +82,44 @@ ui <- fluidPage(
       selectInput("remainder",
                   "Remainder Analysis Type (IQR: 3x above, 3x below IQR, GESD: progressively removes critical values, iterative:",
                   list("IQR", "GESD")),
-      h4("5. Rate of Change"),
+      h4("5. Spike"),
+      numericInput("spike",
+                   "Threshold temperature difference between values:",
+                   min = 0, max = 20, value = 5),
+      h4("6. Rate of Change"),
       numericInput("nsdev",
                    "Rate of change: Number of standard deviations allowed from time average:",
-                   min = 0, max = 5, value = 5),
+                   min = 0, max = 10, value = 5),
       numericInput("pasthours", 
                    "Rate of Change: Number of hours averaged for rate of change:",
                    min = 0, max = 720, value = 50),
-
-      actionButton("submit", "Submit")
+      actionButton("submit", "Submit"),
+      h3("Download Data"),
+      selectInput("dataset", "Choose a dataset:",
+                  choices = c("Flagged", "Filtered")),
+      downloadButton("downloadData", "Download")
+      
     ),
     
     # main panel
     mainPanel(h3("Values Flagged"),
-              tableOutput("vals_removed"),
+              tableOutput("vals_flagged"),
               h3("Plot 1: Pre-QC with flagged values"),
               p(strong("To zoom in, highlight points, then double click inside box. Zoom works on
               both plot 1 and plot 2, but output will show up in plot 2.")),
               
               p(strong(span("Blue x", style = "color:darkturquoise")),
-              "= Temperature limits"),
+              "= QC1 Temperature limits"),
               p(strong(span("Yellow triangle", style= "color:gold")),
-              "= Missing values"),
+              "= QC2 Missing values"),
               p(strong(span("Red circle", style = "color:firebrick")),
-              "= Repeating values"),
+              "= QC3 Repeating values"),
               p(strong(span("Green diamond", style = "color:seagreen")),
-              "= Anomalies"), 
+              "= QC4 Anomalies"), 
               p(strong(span("Magenta square", style = "color:mediumorchid")),
-              "= Rate of Change"),
+              "= QC5 Spike Test"),
+              p(strong(span("Navy upside down triangle", style = "color:darkslateblue")),
+                "= QC6 Rate of Change"),
               
               plotOutput("preQC", dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
@@ -114,7 +127,8 @@ ui <- fluidPage(
               h3("Plot 2: Filtered for temperature limits"),
               plotOutput("postQC_F", dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
-                                           resetOnNew = TRUE))
+                                           resetOnNew = TRUE)),
+              tableOutput("table")
               
     )
   )
@@ -157,7 +171,8 @@ server <- function(input, output) {
       group_by(station, date) %>%
       arrange(station, date, hour) %>%
       summarise(total = length(date)) %>%
-      mutate(Flag_QC2 = ifelse(total<(24-(input$missvals)), "Y", "N"))
+      mutate(Flag_QC2 = ifelse(total<(24-(input$missvals)), "Y", "N")) %>%
+      select(-total)
   })
   
   temp_q2 <- eventReactive(input$submit, {
@@ -193,42 +208,81 @@ server <- function(input, output) {
     rename(Flag_QC4 = anomaly) })
   
    
-  ### Rate of Change
+  ### Spike
   temp_q5 <- eventReactive(input$submit, {
     temp_q4() %>%
       group_by(station) %>%
       arrange(station, datetime) %>%
-      mutate(QC5 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
-      mutate(sdev_th = input$nsdev * runSD(Temp, input$pasthours))%>%
-      mutate(Flag_QC5 = ifelse((QC5 > sdev_th | QC5 > 5), "Y", "N"))  %>%
+      mutate(QC5 = abs(Temp- 0.5 * (lag(Temp, n = 1, default = 0) + lead(Temp, n=1, default = 0))))%>%
+      mutate(Flag_QC5 = ifelse((QC5 > input$spike), "Y", "N"))  %>%
       mutate(Flag_QC5 = replace(Flag_QC5, is.na(Flag_QC5), "N")) %>%
-      select(-QC5)%>%
-      ungroup()
+      select(-QC5) %>%
+    ungroup()
   })
   
-
+  ### Rate of Change
+  temp_q6 <- eventReactive(input$submit, {
+    temp_q5() %>%
+      group_by(station) %>%
+      arrange(station, datetime) %>%
+      mutate(QC6 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
+      mutate(sdev_th = input$nsdev * runSD(Temp, input$pasthours))%>%
+      mutate(Flag_QC6 = ifelse((QC6 > sdev_th), "Y", "N"))  %>%
+      mutate(Flag_QC6 = replace(Flag_QC6, is.na(Flag_QC6), "N")) %>%
+      select(-c(QC6, sdev_th)) %>%
+      ungroup()
+  })
   
   ### Filter all delete rows
   temp_q1_b <-  reactive( {
     temp_q1() %>%
-     filter(Flag_QC1 == "Y")})  
-
+      filter(Flag_QC1 == "Y")})  
+  
   temp_q2_b <- reactive({
     temp_q2() %>%
       filter(Flag_QC2 == "Y")})
-      
+  
   temp_q3_b <- reactive({ 
     temp_q3() %>%
-    filter(Flag_QC3 == "Y") })
+      filter(Flag_QC3 == "Y") })
   
   temp_q4_b <- reactive({ 
     temp_q4() %>%
-    filter(Flag_QC4 == "Y") })
+      filter(Flag_QC4 == "Y") })
   
   temp_q5_b <- reactive({
     temp_q5() %>%
       filter(Flag_QC5 == "Y")
   })
+  
+  temp_q6_b <- reactive({
+    temp_q6() %>%
+      filter(Flag_QC6 == "Y")
+  })
+  
+### Create and select datasets ###---------------------------------------------------------  
+  ### AllFlags
+  temp_flags <- reactive( {
+    temp_q6() %>%
+      ungroup() %>%
+      mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5, ",", Flag_QC6))
+  })
+  
+  ### Filtered data 
+  temp_final <- reactive( {
+    temp_flags() %>%
+    filter(grepl("N,N,N,N,N,N", AllFlags)) })
+  
+  ### Have user select which dataset they want
+  datasetInput <- reactive({
+    switch(input$dataset,
+           "Flagged" = temp_flags(),
+           "Filtered" = temp_final())
+  })
+  
+
+### ----------------------------------------------------------------------------------------
+ 
   
   
   # Plot 2: Within temperature limits 
@@ -236,26 +290,30 @@ server <- function(input, output) {
   # hard to see the actual trends 
   
   # For plot 2
-  temp_q5_plot <- eventReactive(input$submit, {
-    temp_q5() %>%
+  temp_q6_plot <- eventReactive(input$submit, {
+    temp_q6() %>%
       filter(Flag_QC1 =="N")
   })
   
   temp_q2_b_plot <- reactive({
-    temp_q5_plot() %>%
+    temp_q6_plot() %>%
     filter(Flag_QC2 == "Y") })
   
   temp_q3_b_plot <- reactive({
-    temp_q5_plot() %>%
+    temp_q6_plot() %>%
     filter(Flag_QC3 == "Y") })
   
   temp_q4_b_plot <- reactive({
-    temp_q5_plot() %>%
+    temp_q6_plot() %>%
     filter(Flag_QC4 == "Y")})
   
   temp_q5_b_plot <- reactive({
-    temp_q5_plot() %>%
-    filter(Flag_QC5 == "Y")})
+    temp_q6_plot() %>%
+      filter(Flag_QC5 == "Y")})
+  
+  temp_q6_b_plot <- reactive({
+    temp_q6_plot() %>%
+    filter(Flag_QC6 == "Y")})
   
   
   ###############################################################
@@ -264,11 +322,11 @@ server <- function(input, output) {
   
   # Describes the amount of data removed 
   
-  output$vals_removed <- renderTable({
+  output$vals_flagged <- renderTable({
     
     # Make table
     # Counts the number of rows of data being flagged
-    vals_removed <- temp_q5() %>%
+   temp_flags() %>%
       group_by(station) %>%
       summarize(Init = n(),
                 QC1 = sum(Flag_QC1 =="Y"),
@@ -276,11 +334,14 @@ server <- function(input, output) {
                 QC3 = sum(Flag_QC3 == "Y", na.rm = TRUE),
                 QC4 = sum(Flag_QC4 == "Y"),
                 QC5 = sum(Flag_QC5 == "Y"),
-                Remaining = sum(Flag_QC1=="N" & Flag_QC2 == "N" & Flag_QC3 =="N" & Flag_QC4 =="N"
-                                & Flag_QC5 == "N", na.rm = TRUE),
-                Prop_remaining = round(Remaining/Init*100,1)) %>%
-      arrange(Prop_remaining)
-    
+                QC6 = sum(Flag_QC6 == "Y"),
+                QCTotal = sum(grepl("Y", AllFlags)),
+                #Remaining = sum(Flag_QC1=="N" & Flag_QC2 == "N" & Flag_QC3 =="N" & Flag_QC4 =="N"
+                #                & Flag_QC5 == "N" & Flag_QC6 == "N", na.rm = TRUE),
+                Percent_Flagged = round(QCTotal/Init * 100,1)) %>%
+                #Prop_remaining = round(Remaining/Init*100,1)) %>%
+      arrange(Percent_Removed)
+
   })
   
   
@@ -305,6 +366,7 @@ server <- function(input, output) {
       geom_point(data = temp_q3_b(), aes(datetime, Temp), color = "indianred3", size = 3, shape = 20) +
       geom_point(data = temp_q4_b(), aes(datetime, Temp), color = "springgreen4", size = 3.5, shape = 18) +
       geom_point(data = temp_q5_b(), aes(datetime, Temp), color = "mediumorchid", size = 3, shape = 0) +
+      geom_point(data = temp_q6_b(), aes(datetime, Temp), color = "darkslateblue", size = 3, shape = 6) +
       coord_cartesian(xlim = ranges$x, ylim = ranges$y, expand = TRUE) +
       labs(y = "Temp (deg C)") +
       scale_x_datetime() + 
@@ -342,11 +404,12 @@ server <- function(input, output) {
     # Plot the data ########################################################################################
     # Each geom_point() plots a different flag
     ggplot() +
-      geom_point(data = temp_q5_plot(), aes(datetime, Temp), col = "lightsteelblue3") +
+      geom_point(data = temp_q6_plot(), aes(datetime, Temp), col = "lightsteelblue3") +
       geom_point(data = temp_q2_b_plot(), aes(datetime, Temp), color = "goldenrod2", size = 3, shape = 2) +
       geom_point(data = temp_q3_b_plot(), aes(datetime, Temp), color = "indianred3", size = 3, shape = 20) +
       geom_point(data = temp_q4_b_plot(), aes(datetime, Temp), color = "springgreen4", size = 3.5, shape = 18) +
       geom_point(data = temp_q5_b_plot(), aes(datetime, Temp), color = "mediumorchid", size = 3, shape = 0) +
+      geom_point(data = temp_q6_b_plot(), aes(datetime, Temp), color = "darkslateblue", size = 3, shape = 6) +
       labs(y = "Temp (deg C)") +
       scale_x_datetime() +
       theme_bw() +
@@ -370,7 +433,25 @@ server <- function(input, output) {
       ranges$y <- NULL
     }
   })
+  
+  ##########################################################
+  ### Download data
+  ###############################################
+  # output$table <- renderTable({
+  #   temp_q6_b_plot()
+  # })
+  today = today()
+  output$downloadData <- downloadHandler(
+    filename = function() {
+      paste(input$station, "_", input$dataset, "_", today, ".rds", sep = "")
+    },
+    content = function(file) {
+      write_rds(datasetInput(), file)
+    }
+  )
+  
 }
+
 
 # Run the application 
 shinyApp(ui = ui, server = server)

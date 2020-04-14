@@ -87,10 +87,12 @@ temp_q1_b <- temp_q1 %>%
 
 # This data frame contains all the dates with less than 20 values. 
 temp_q2_a <- temp_q1 %>%
+  filter(Flag_QC1 == "N") %>% # See next comment about removing QC1="Y" values
   group_by(station, date) %>%
   arrange(station, date, hour) %>%
   summarise(total = n()) %>%
-  mutate(Flag_QC2 = ifelse(total < 20, "Y", "N"))
+  mutate(Flag_QC2 = ifelse(total < 20, "Y", "N")) %>%
+  select(-total)
 
 # Flagged values
 temp_q2_b <- temp_q2_a %>%
@@ -99,11 +101,9 @@ temp_q2_b <- temp_q2_a %>%
 #Join original dataframe with flagged values based on values NOT in common. 
 #based on station and date
 temp_q2 <- temp_q1 %>%
-  left_join(temp_q2_a, by = c("station", "date"))
-
-# Remove unnecessaries
-#rm(temp_q1_a)
-gc()
+  left_join(temp_q2_a, by = c("station", "date")) %>%
+  filter(Flag_QC1 == "N") # This part is important for QC5 and QC6. Basically removes all values that are not within range (QC1) 
+      # for BET (maybe other stations) there were some alternately repeating values near 0 that were causing lots of spike QCs to be positive.
 
 ```
 
@@ -149,8 +149,8 @@ temp_q3_b <- temp_q3 %>%
   filter(Flag_QC3 == "Y")
 
 # Remove unnecessaries
-#rm(temp_q2_a, temp_q1)
-#gc()
+rm(temp_q2_a)
+gc()
 
 ```
 
@@ -194,26 +194,22 @@ temp_q4_b <- temp_q4 %>%
 
 ```
 
-### QC5) Rate of change and Spike test
+### QC5) Spike test
 
 Anomalize is pretty good, but there are a few single points here and there that don't get detected. 
-1. Define standard deviation threshold
-2. If difference between value and the value before it > threshold, it is flagged.
-3. If difference between value and the value before it > 5, it is flagged.
+1. If difference between value and the value before it > 5, it is flagged.
 
-```{r Rate of Change}
+
+```{r Spike test}
 ### ---------------------------------------------
-# Q5: Temp - Temp-1
-# sdev_th: Determined threshold for too high of a rate of change (5 * SD(Temp) over 50 hours or 2 tidal cycles)
-# If Q5 > sdev_th, flag.
+# Q5: Temp - Temp@time-1
 # Additionally, if Q5 > 5 (5 degree change in 1 hour), flag. 
 
 temp_q5 <- temp_q4 %>%
   group_by(station) %>%
   arrange(station, datetime) %>%
-  mutate(QC5 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
-  mutate(sdev_th = 5 * runSD(Temp, 50))%>%
-   mutate(Flag_QC5 = ifelse((QC5 > sdev_th | QC5 > 5), "Y", "N"))  %>%
+  mutate(QC5 = abs(Temp- 0.5 * (lag(Temp, n = 1, default = 0) + lead(Temp, n=1, default = 0))))%>%
+  mutate(Flag_QC5 = ifelse((QC5 > 5), "Y", "N"))  %>%
       mutate(Flag_QC5 = replace(Flag_QC5, is.na(Flag_QC5), "N")) %>%
   select(-QC5)
   ungroup()
@@ -222,21 +218,46 @@ temp_q5 <- temp_q4 %>%
 temp_q5_b <- temp_q5 %>%
   filter(Flag_QC5 == "Y")
 
-#rm(temp_q3_a)
+```
+
+
+### QC6) Rate of Change Test
+2. Define standard deviation threshold
+3. If difference between value and the value before it > threshold, it is flagged.
+
+```{r Rate of Change}
+# Q6 = Temp - Temp@time-1
+# sdev_th: Determined threshold for too high of a rate of change (5 * SD(Temp) over 50 hours or 2 tidal cycles)
+# If Q6 > sdev_th, flag.
+
+temp_q6 <- temp_q5 %>%
+  group_by(station) %>%
+  arrange(station, datetime) %>%
+  mutate(QC6 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
+  mutate(sdev_th = 5 * runSD(Temp, 50))%>%
+  mutate(Flag_QC6 = ifelse((QC6 > sdev_th), "Y", "N"))  %>%
+      mutate(Flag_QC6 = replace(Flag_QC6, is.na(Flag_QC6), "N")) %>%
+  select(-c(QC6, sdev_th)) %>%
+  ungroup()
+
+# Flagged values
+temp_q6_b <- temp_q6 %>%
+  filter(Flag_QC6 == "Y")
 
 ```
+
 
 ## Filter final 
 
 ```{r final dataset}
 # Combine Flags 
-temp_flags <- temp_q5 %>%
+temp_flags <- temp_q6 %>%
   ungroup() %>%
-  mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5))
+  mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5, ",", Flag_QC6))
 head(temp_flags)
 
 temp_final <- temp_flags %>%
-  filter(grepl("N,N,N,N,N", AllFlags))
+  filter(grepl("N,N,N,N,N,N", AllFlags))
 
 ```
 
@@ -282,7 +303,7 @@ for (name in levels(temp_final$station)) {
 
 ```{r Data removal}
 # By station 
-(Removed_station <- temp_flags %>%
+(Flagged_stations <- temp_flags %>%
   group_by(station) %>%
   summarize(Init = n(),
             QC1 = sum(Flag_QC1=="Y"),
@@ -290,18 +311,21 @@ for (name in levels(temp_final$station)) {
             QC3 = sum(Flag_QC3 == "Y"),
             QC4 = sum(Flag_QC4 == "Y"),
             QC5 = sum(Flag_QC5 == "Y"),
-            QCTot = sum(grepl("Y",AllFlags)),
-            Pct_Removed_QC1 = round(QC1/Init*100,1),
-            Pct_Removed_QC2 = round(QC2/Init*100,1),
-            Pct_Removed_QC3 = round(QC3/Init*100,1),
-            Pct_Removed_QC4 = round(QC4/Init*100,1),
-            Pct_Removed_QC5 = round(QC5/Init*100,1),
-            Pct_Removed_Total = round(QCTot/Init * 100,1) ))
+            QC6 = sum(Flag_QC6 == "Y"),
+            QCTot = sum(grepl("Y", AllFlags)),
+            Pct_Flagged_QC1 = round(QC1/Init*100,1),
+            Pct_Flagged_QC2 = round(QC2/Init*100,1),
+            Pct_Flagged_QC3 = round(QC3/Init*100,1),
+            Pct_Flagged_QC4 = round(QC4/Init*100,1),
+            Pct_Flagged_QC5 = round(QC5/Init*100,1),
+            Pct_Flagged_QC6 = round(QC6/Init*100,1),
+            Pct_Flagged_Total = round(QCTot/Init * 100,1) ))
 
+write(Flagged_stations, "Tempdata/QC/Flagged_Percentages.csv")
 # Overall dataset
 Flags <- temp_flags %>%
-  filter(grepl("Y", AnyFlag))
-print(paste0(round(nrow(Flags)/nrow(temp_q5)*100,2), "% flagged"))
+  filter(grepl("Y", AllFlags))
+print(paste0(round(nrow(Flags)/nrow(temp_q6)*100,2), "% flagged"))
 
 ```
 
