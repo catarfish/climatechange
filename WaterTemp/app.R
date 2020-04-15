@@ -17,8 +17,9 @@ library(anomalize) # rate of change
 library(tibbletime) # rate of change - tables
 
 # Read in file --------------------------------------------------------------
-setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/climatechange/")
-temp_H <- readRDS("WaterTemp/data/Temp_all_H.rds")
+### Change setwd if you need to:
+# setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/climatechange/WaterTemp/")
+temp_H <- readRDS("data/Temp_all_H.rds")
 
 # Function to determine whether values are repeating by each station -------------------------------------
 # Inputs are data frame and x (number of repeating values you want to check for)
@@ -52,8 +53,6 @@ ui <- fluidPage(
   sidebarLayout(
     position = "left",
     sidebarPanel(
-      
-      
       h3("Filters"),
       h4("Station and Date"),
       uiOutput("station_selector"), # See station_selector in server section
@@ -80,8 +79,11 @@ ui <- fluidPage(
                   "Seasonal Decomposition Method (Loess = STL, Median = Twitter):",
                   list("STL", "Twitter")),
       selectInput("remainder",
-                  "Remainder Analysis Type (IQR: 3x above, 3x below IQR, GESD: progressively removes critical values, iterative:",
+                  "Remainder Analysis Type (IQR: 3x above, 3x below IQR, GESD: progressively removes critical values, iterative, very slow:",
                   list("IQR", "GESD")),
+      numericInput("alpha",
+                   "Select alpha: smaller value makes it more difficult to be an anomaly (3 x IQR = 0.05, 6 x IQR = 0.025, 1.5 x IQR = 0.1)",
+                   min = 0.025, max = 0.1, value = 0.05, step = 0.0125),
       h4("5. Spike"),
       numericInput("spike",
                    "Threshold temperature difference between values:",
@@ -95,14 +97,19 @@ ui <- fluidPage(
                    min = 0, max = 720, value = 50),
       actionButton("submit", "Submit"),
       h3("Download Data"),
+      p(em(span("Note: Only downloads the data for the selected station and dates.", style = "color:coral"))),
+      p(strong("Flagged data contains all data | Filtered data contains only flag-free data")),
       selectInput("dataset", "Choose a dataset:",
                   choices = c("Flagged", "Filtered")),
+      
       downloadButton("downloadData", "Download")
       
     ),
     
     # main panel
     mainPanel(h3("Values Flagged"),
+              p(em(span("Note: QC1 values (values outside of temperature range) were filtered out prior to conducting tests QC2-QC6", 
+                        style = "color:coral"))),
               tableOutput("vals_flagged"),
               h3("Plot 1: Pre-QC with flagged values"),
               p(strong("To zoom in, highlight points, then double click inside box. Zoom works on
@@ -121,9 +128,13 @@ ui <- fluidPage(
               p(strong(span("Navy upside down triangle", style = "color:darkslateblue")),
                 "= QC6 Rate of Change"),
               
-              plotOutput("preQC", dblclick = "preQC_dblclick",
+              plotOutput("preQC", 
+                         click = "preQC_click",
+                         dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
                                            resetOnNew = TRUE)),
+              p(strong(span("Single click on a point to look at nearby datetimes and temperatures"))),
+              verbatimTextOutput("info"),
               h3("Plot 2: Filtered for temperature limits"),
               plotOutput("postQC_F", dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
@@ -163,7 +174,7 @@ server <- function(input, output) {
       mutate(Flag_QC1 = ifelse((Temp<input$temprange[1] | Temp>input$temprange[2]), "Y", "N"))
     
   })
-  
+
   ### QC2) Missing values ###
   temp_q2_a <- eventReactive(input$submit,{
     temp_q1() %>%
@@ -176,9 +187,9 @@ server <- function(input, output) {
   })
   
   temp_q2 <- eventReactive(input$submit, {
-      left_join(temp_q1(), temp_q2_a(), by = c("station", "date")) %>%
+    left_join(temp_q1(), temp_q2_a(), by = c("station", "date")) %>%
       filter(Flag_QC1 == "N") # This part is important for QC5 and QC6. Basically removes all values that are not within range (QC1) 
-      # for BET (maybe other stations) there were some alternately repeating values near 0 that were causing lots of spike QCs to be positive.
+    # for BET (maybe other stations) there were some alternately repeating values near 0 that were causing lots of spike QCs to be positive.
   })
   
   ### QC3) Repeating Values
@@ -195,7 +206,7 @@ server <- function(input, output) {
   temp_q4_c <- eventReactive(input$submit, {
     temp_q4_a() %>%
       time_decompose(Temp, method = input$seasonal, trend = input$trend) %>%
-      anomalize(remainder, method = input$remainder) %>%
+      anomalize(remainder, method = input$remainder, alpha = input$alpha) %>%
       time_recompose() %>% 
       select(c(datetime, anomaly)) %>%
       as_tibble() })
@@ -262,11 +273,23 @@ server <- function(input, output) {
       filter(Flag_QC6 == "Y")
   })
   
+  
+  
   ### Create and select datasets ###---------------------------------------------------------  
+  
+  ### Merge back in QC1 Flags, since these were removed from the q6 dataset
+  temp_q1_table <- reactive({
+    temp_q1() %>%
+      mutate(Flag_QC2 = "N",
+             Flag_QC3 = "N", 
+             Flag_QC4 = "N",
+             Flag_QC5 = "N",
+             Flag_QC6 = "N")
+  })
+  
   ### AllFlags
   temp_flags <- reactive( {
-    temp_q6() %>%
-      ungroup() %>%
+    rbind(temp_q6(), temp_q1_table()) %>%
       mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5, ",", Flag_QC6))
   })
   
@@ -338,10 +361,7 @@ server <- function(input, output) {
                 QC5 = sum(Flag_QC5 == "Y"),
                 QC6 = sum(Flag_QC6 == "Y"),
                 QCTotal = sum(grepl("Y", AllFlags)),
-                #Remaining = sum(Flag_QC1=="N" & Flag_QC2 == "N" & Flag_QC3 =="N" & Flag_QC4 =="N"
-                #                & Flag_QC5 == "N" & Flag_QC6 == "N", na.rm = TRUE),
                 Percent_Flagged = round(QCTotal/Init * 100,1)) %>%
-      #Prop_remaining = round(Remaining/Init*100,1)) %>%
       arrange(Percent_Flagged)
     
   })
@@ -391,6 +411,12 @@ server <- function(input, output) {
       ranges$x <- NULL
       ranges$y <- NULL
     }
+  })
+  
+  output$info <- renderPrint({
+    d <- nearPoints(temp_flags(), input$preQC_click, xvar = "datetime", yvar = "Temp")[1:5,2:3]
+    arrange(d, datetime)
+    d
   })
   
   ############################################################################
