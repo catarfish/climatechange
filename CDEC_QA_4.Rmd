@@ -102,7 +102,7 @@ temp_q2_b <- temp_q2_a %>%
 #based on station and date
 temp_q2 <- temp_q1 %>%
   left_join(temp_q2_a, by = c("station", "date")) %>%
-  filter(Flag_QC1 == "N") # This part is important for QC5 and QC6. Basically removes all values that are not within range (QC1) 
+ filter(Flag_QC1 == "N") # This part is important for QC5 and QC6. Basically removes all values that are not within range (QC1) 
       # for BET (maybe other stations) there were some alternately repeating values near 0 that were causing lots of spike QCs to be positive.
 
 ```
@@ -163,6 +163,7 @@ gc()
 ```{r anomalize}
 library(anomalize)
 library(tibbletime)
+# see https://business-science.github.io/anomalize/articles/anomalize_methods.html
   
 # Subset data that can use this method (some data have too short of a period)
 # temp_test <- temp_H %>% filter(station %in% c("OAD"))
@@ -171,10 +172,15 @@ library(tibbletime)
 temp_q4_a <- as_tbl_time(temp_q3, index = datetime)
 
 # Anomaly Detection
+# time_decompose: separates time series into seasonal, trend, and remainder components
+  # stl: loess works well when long term trend is present
+  # twitter: (removes median rather than fitting smoother) - when long-term trend is less dominant than short-term seasonal component
+# anomalize: applies anomaly detection methods to remainder component
+# time_recompose: calculate limits to separate "normal" data from anomalies
 temp_q4_c <- temp_q4_a %>%
     group_by(station) %>%
     time_decompose(Temp, method = "stl", trend = "3 months") %>%
-    anomalize(remainder, method = "iqr") %>%
+    anomalize(remainder, method = "iqr", alpha = 0.05) %>%
     time_recompose() %>% 
     select(c(datetime, anomaly)) %>%
     as_tibble() 
@@ -250,8 +256,18 @@ temp_q6_b <- temp_q6 %>%
 ## Filter final 
 
 ```{r final dataset}
+# Merge back in q1 data
+# Data that were filtered out were not subsequently run under other QC tests, so should be NA, but this messes up other flags, so
+# flagged as "N"
+temp_q1_table <- temp_q1 %>%
+      mutate(Flag_QC2 = "N",
+             Flag_QC3 = "N", 
+             Flag_QC4 = "N",
+             Flag_QC5 = "N",
+             Flag_QC6 = "N")
+
 # Combine Flags 
-temp_flags <- temp_q6 %>%
+temp_flags <- rbind(temp_q6, temp_q1_table) %>%
   ungroup() %>%
   mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5, ",", Flag_QC6))
 head(temp_flags)
@@ -264,6 +280,8 @@ temp_final <- temp_flags %>%
 ## Write files
 
 ```{r WriteFile, message = FALSE}
+temp_flags <- readRDS("TempData/QC/Temp_flagged.rds")
+
 saveRDS(temp_flags, "TempData/QC/Temp_flagged.rds")
 write_csv(temp_flags, "TempData/QC/Temp_flagged.csv")
 
@@ -282,7 +300,7 @@ for (name in levels(temp_flags$station)) {
 
 
 saveRDS(temp_final, "TempData/QC/Temp_filtered.rds")
-write_csv(temp_flags, "TempData/QC/Temp_filtered.csv")
+write_csv(temp_final, "TempData/QC/Temp_filtered.csv")
 
 ### Individual files to csv
 # write each file as a csv
@@ -303,6 +321,8 @@ for (name in levels(temp_final$station)) {
 
 ```{r Data removal}
 # By station 
+
+
 (Flagged_stations <- temp_flags %>%
   group_by(station) %>%
   summarize(Init = n(),
@@ -313,15 +333,15 @@ for (name in levels(temp_final$station)) {
             QC5 = sum(Flag_QC5 == "Y"),
             QC6 = sum(Flag_QC6 == "Y"),
             QCTot = sum(grepl("Y", AllFlags)),
-            Pct_Flagged_QC1 = round(QC1/Init*100,1),
-            Pct_Flagged_QC2 = round(QC2/Init*100,1),
-            Pct_Flagged_QC3 = round(QC3/Init*100,1),
-            Pct_Flagged_QC4 = round(QC4/Init*100,1),
-            Pct_Flagged_QC5 = round(QC5/Init*100,1),
-            Pct_Flagged_QC6 = round(QC6/Init*100,1),
-            Pct_Flagged_Total = round(QCTot/Init * 100,1) ))
+            Pct_Flagged_QC1 = round(QC1/Init*100,2),
+            Pct_Flagged_QC2 = round(QC2/Init*100,2),
+            Pct_Flagged_QC3 = round(QC3/Init*100,2),
+            Pct_Flagged_QC4 = round(QC4/Init*100,2),
+            Pct_Flagged_QC5 = round(QC5/Init*100,2),
+            Pct_Flagged_QC6 = round(QC6/Init*100,2),
+            Pct_Flagged_Total = round(QCTot/Init * 100,2) ))
 
-write(Flagged_stations, "Tempdata/QC/Flagged_Percentages.csv")
+write_csv(Flagged_stations, "Tempdata/QC/Flagged_Percentages.csv")
 # Overall dataset
 Flags <- temp_flags %>%
   filter(grepl("Y", AllFlags))
