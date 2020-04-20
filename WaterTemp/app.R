@@ -18,8 +18,16 @@ library(tibbletime) # rate of change - tables
 
 # Read in file --------------------------------------------------------------
 ### Change setwd if you need to:
-# setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/climatechange/WaterTemp/")
+setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/climatechange/WaterTemp/")
+# The bulk of the data
 temp_H <- readRDS("data/Temp_all_H.rds")
+# This includes station name (rather than code) 
+# Need to make a list so can add "names" which will allow the display of station to be different than the actual code inputted
+latlons <- read.csv("data/latlonsTomerge.csv")
+latlons <- as.list(mutate(latlons, staDesc = paste(station, stationName, sep = " | ")))
+names(latlons$station) <- latlons$staDesc
+# temp_H <- left_join(temp_H, latlons, by = "station")
+
 
 # Function to determine whether values are repeating by each station -------------------------------------
 # Inputs are data frame and x (number of repeating values you want to check for)
@@ -98,7 +106,10 @@ ui <- fluidPage(
       actionButton("submit", "Submit"),
       h3("Download Data"),
       p(em(span("Note: Only downloads the data for the selected station and dates.", style = "color:coral"))),
-      p(strong("Flagged data contains all data | Filtered data contains only flag-free data")),
+      p(strong("Flagged data"), 
+        "contains all data | ", 
+        strong("Filtered data"), 
+        "contains only flag-free data"),
       selectInput("dataset", "Choose a dataset:",
                   choices = c("Flagged", "Filtered")),
       
@@ -112,28 +123,35 @@ ui <- fluidPage(
                         style = "color:coral"))),
               tableOutput("vals_flagged"),
               h3("Plot 1: Pre-QC with flagged values"),
-              p(strong("To zoom in, highlight points, then double click inside box. Zoom works on
-              both plot 1 and plot 2, but zoomed output will show up in plot 1. Double click on plot 1 to zoom back out.")),
+              p(strong(span("To zoom in, highlight points, then double click inside box. Zoom works on
+              both plot 1 and plot 2, but zoomed output will show up in plot 1. 
+                            Double click on plot 1 to zoom back out.", style = "color:chocolate"))),
               
-              p(strong(span("Blue x", style = "color:darkturquoise")),
-                "= QC1 Temperature limits"),
-              p(strong(span("Yellow triangle", style= "color:gold")),
-                "= QC2 Missing values"),
-              p(strong(span("Red circle", style = "color:firebrick")),
-                "= QC3 Repeating values"),
-              p(strong(span("Green diamond", style = "color:seagreen")),
-                "= QC4 Anomalies"), 
-              p(strong(span("Magenta square", style = "color:mediumorchid")),
-                "= QC5 Spike Test"),
-              p(strong(span("Navy upside down triangle", style = "color:darkslateblue")),
-                "= QC6 Rate of Change"),
+              p(strong("QC1"),
+                strong(span("Blue x", style = "color:darkturquoise")),
+                "= Temperature limits"),
+              p(strong("QC2"),
+                strong(span("Yellow triangle", style= "color:gold")),
+                "= Missing values"),
+              p(strong("QC3"),
+                strong(span("Red circle", style = "color:firebrick")),
+                "= Repeating values"),
+              p(strong("QC4"),
+                strong(span("Green diamond", style = "color:seagreen")),
+                "= Anomalies"), 
+              p(strong("QC5"),
+                strong(span("Magenta square", style = "color:mediumorchid")),
+                "= Spike Test"),
+              p(strong("QC6"),
+                strong(span("Navy upside down triangle", style = "color:darkslateblue")),
+                "= Rate of Change"),
               
               plotOutput("preQC", 
                          click = "preQC_click",
                          dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
                                            resetOnNew = TRUE)),
-              p(strong(span("Single click on a point to look at nearby datetimes and temperatures"))),
+              p(strong(span("Single click on a point to look at nearby datetimes and temperatures", style = "color:chocolate"))),
               verbatimTextOutput("info"),
               h3("Plot 2: Filtered for temperature limits"),
               plotOutput("postQC_F", dblclick = "preQC_dblclick",
@@ -152,10 +170,12 @@ server <- function(input, output) {
   output$station_selector = renderUI({ #creates station select box object called in ui
     selectInput(inputId = "station", #name of input
                 label = "Station Code:", #label displayed in ui
-                choices = as.character(unique(temp_H$station)),
+                choices = latlons$station,
                 # calls unique values from the station column in the previously created table
                 selected = "ANC") #default choice (not required)
   })
+  
+  
   
   ### Define reactive values for the zoom function
   ranges <- reactiveValues(x = NULL, y = NULL)
