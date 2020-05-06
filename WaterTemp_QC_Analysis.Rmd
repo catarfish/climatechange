@@ -1,0 +1,567 @@
+---
+title: "WaterTemp_QC_Analysis"
+author: "Catarina Pien"
+date: "4/24/2020"
+output: 
+  html_document:
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls(all=TRUE))
+```
+
+### Load Data
+
+```{r load, include = FALSE, warning = FALSE}
+library(data.table)
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(plotly)
+library(lubridate)
+
+#create a list of the files from your target directory
+path1 <- "TempData/Analysis/1year/"
+path2 <- "TempData/Analysis/6month/"
+path3 <- "TempData/Analysis/3month/"
+files1 = list.files(path = path1, pattern="*.csv", full.names = TRUE)
+oneyear = plyr::ldply(files1, read_csv)
+
+files2 = list.files(path = path2, pattern="*.csv", full.names = TRUE)
+sixmonth = plyr::ldply(files2, read_csv)
+
+files3 = list.files(path = path3, pattern="*.csv", full.names = TRUE)
+threemonth = plyr::ldply(files3, read_csv)
+
+head(oneyear)
+```
+
+### Filter Data
+* June - September only
+* Only "clean" data to compare the three datasets
+```{r filter, results=FALSE, warning = FALSE}
+Temp12 <- oneyear %>% filter(AllFlags == "N,N,N,N,N,N") %>% filter(month>5 & month<10)
+Temp6 = sixmonth %>% filter(AllFlags == "N,N,N,N,N,N") %>% filter(month>5 & month<10)
+Temp3 = threemonth %>% filter(AllFlags == "N,N,N,N,N,N") %>% filter(month>5 & month<10)
+
+Temp12$year <- ordered(Temp12$year)
+Temp12$month <- ordered(Temp12$month)
+Temp12$hour <- ordered(Temp12$hour)
+
+Temp6$year <- ordered(Temp6$year)
+Temp6$month <- ordered(Temp6$month)
+Temp6$hour <- ordered(Temp6$hour)
+
+Temp3$year <- ordered(Temp3$year)
+Temp3$month <- ordered(Temp3$month)
+Temp3$hour <- ordered(Temp3$hour)
+
+```
+
+# Analysis {.tabset}
+## Maximum Temperatures {.tabset}
+
+#### Compare results from 3 months, 6 months, 1 year for trend:
+* Stations = longest/high variability (MAL), high temperatures (FRK, MSD, SJR, VCU),
+low variability (RVB), QC4 (PPT), QC5 (CCS), QC6 (PTS)
+* Max temps in June, July, August, September 
+* Number of days >= 27C in June, July, August, September
+
+### 1.  Max daily temperatures
+Definitely see higher temperatures in the months12 trend at CCS and MAL.
+
+```{r daily max, fig.width = 12, fig.height = 16, warning = FALSE, message = FALSE}
+
+### Max daily temperatures --------------------------------------------------------------------------
+max12 <- Temp12  %>% group_by(station, year, month, date) %>% summarize(max.temp12 = max(Temp)) %>% ungroup()
+max6 <- Temp6  %>% group_by(station, year, month, date) %>% summarize(max.temp6 = max(Temp)) %>% ungroup()
+max3 <- Temp3  %>% group_by(station, year, month, date) %>% summarize(max.temp3 = max(Temp)) %>% ungroup()
+
+# Joins
+max1 <- left_join(max12, max6)
+max2 <- left_join(max1, max3)
+
+# Long format
+MaxAll <- pivot_longer(max2, cols = starts_with("max"), names_to = "trend", values_to = "MaxTemp")
+MaxAll$trend <- ordered(MaxAll$trend, levels = c("max.temp3", "max.temp6", "max.temp12"))
+levels(MaxAll$trend) <- gsub("max.temp", "months", levels(MaxAll$trend))
+
+# Plot
+ggplot(MaxAll, aes(x = date, y = MaxTemp, color = trend)) + geom_point(alpha = 0.6, size = 4) + facet_grid(rows = vars(station), scales = "free") +
+    scale_x_date(date_breaks = "1 year") +
+  theme_bw() + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14))
+
+```
+
+### 2. Max monthly temperatures
+Definitely see higher temperatures in the months12 trend.
+```{r monthly max, fig.width = 12, fig.height = 17, warning = FALSE, message = FALSE}
+### Max monthly temperatures -------------------------------------------------------
+max12mon <- max12 %>% group_by(station, year, month) %>% summarize(maxmon12 = max(max.temp12))
+max6mon <- max6 %>% group_by(station, year, month) %>% summarize(maxmon6 = max(max.temp6))
+max3mon <- max3 %>% group_by(station, year, month) %>% summarize(maxmon3 = max(max.temp3))
+
+mon1 <- left_join(max12mon, max6mon)
+mon2 <- left_join(mon1, max3mon)
+
+# Long format
+maxMonthLong <- pivot_longer(mon2, cols = starts_with("maxmon"), names_to = "trend", values_to = "MaxTemp")
+maxMonthLong$trend <- ordered(maxMonthLong$trend, levels = c("maxmon3", "maxmon6", "maxmon12"))
+levels(maxMonthLong$trend) <- gsub("maxmon", "months", levels(maxMonthLong$trend))
+
+# Scatterplot
+ggplot(maxMonthLong, aes(x = year, y = MaxTemp, color = trend)) + geom_point(alpha = 0.6, size = 4) + facet_grid(rows = vars(station), scales = "free") +
+  theme_bw() + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14))
+
+# Boxplot
+ggplot(maxMonthLong, aes(x = year, y = MaxTemp, fill = trend)) + geom_boxplot(position = "dodge2") + facet_grid(rows = vars(station), scales = "free") +
+  theme_bw() + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14))
+```
+
+### 3. Days per year with max temps >= 27
+* Not a huge difference for the most part. 
+* Greatest difference between the months12 (1 year) trend and the others. 
+* VCU and PPT 2006 are likely true as there was a heat wave July 23-24. For some reason the 6-month trend cuts this off but the 3-month and 1-year do not. See plot of June-July temps for 2006. 
+* MAL 2006 likely outliers
+
+```{r max threshold, fig.width = 12, fig.height = 10, warning = FALSE, message = FALSE}
+### Number of days max temp is >= 27C -------------------------------------------------------
+max12days <- max12 %>% group_by(station, year) %>% summarize(nmax12 = sum(max.temp12 >= 27))
+max6days <- max6 %>% group_by(station, year) %>% summarize(nmax6 = sum(max.temp6>=27))
+max3days <- max3 %>% group_by(station, year) %>% summarize(nmax3 = sum(max.temp3>=27))
+
+a <- left_join(max12days, max6days)
+maxTempDays <- left_join(a, max3days)
+
+# Long format
+maxTempsLong <- pivot_longer(maxTempDays, cols = starts_with("nmax"), names_to = "trend", values_to = "ndays")
+maxTempsLong$trend <- ordered(maxTempsLong$trend, levels = c("nmax3", "nmax6", "nmax12"))
+levels(maxTempsLong$trend) <- gsub("nmax", "months", levels(maxTempsLong$trend))
+
+# Plot maximum temperatures for the three trends 
+maxPlots <- maxTempsLong %>% filter(ndays>0)
+
+ggplot(maxPlots, aes(year, ndays, fill = trend)) + geom_col(position = "dodge2") + 
+  facet_grid(rows = vars(station), scales = "free") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14))
+
+# Check it out: 2006 MAL,VCU, PPT
+hi1 <- Temp12 %>%
+  filter(year ==  "2006" & (month == "6"|month == "7") & station %in% c("PPT", "VCU", "MAL"))
+
+ggplot(hi1, aes(x = datetime, y = Temp )) + geom_point() + facet_grid(station~.) +
+    labs(title = "2006 June-July Temps") +
+    theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14))
+
+# Check it out: 2006 VCU and PPT
+mergemax1 <-  left_join(max12, max6)
+mergemax2 <- left_join(mergemax1, max3)
+print("Filter Max temperatures (1year) >= 26")
+mergemax2 %>%
+  filter(station %in% c("PPT", "VCU", "MAL"),
+         max.temp12>=26) %>%
+  print(n=50)
+
+```
+
+## Heat Wave Analysis
+### 1. Download Air Temperature Stations: MAL, MSD, SJR
+
+```{r airtemp dl, eval = FALSE, message = FALSE, warning = FALSE, fig.width = 12}
+library(data.table) #rbindlist()
+library(CDECRetrieve)#cdec_datasets
+
+# Download air temperature data
+# Stations
+staAir <- c("SJR", "MSD", "MAL")
+# Start and end dates - these will remain the same throughout
+start <- "1986-01-01"
+end <- "2019-12-31"
+
+# Sensor number, time interval - these are different for each set of stations
+sensor1 <- "4"
+interval1 <- "H"
+
+### Download data, bind, write --------------------------------------------
+TempAir_Raw <- lapply(staAir, 
+                 function(x){
+                   cdec_query(station = x,
+                              sensor_num = sensor1,
+                              dur_code = interval1,
+                              start_date = start,
+                              end_date = end)
+                 })
+
+TempAir_Raw_df <- bind_rows(TempAir_Raw) # bind rows into data frame
+str(TempAir_Raw_df)
+
+TempAir_Raw_df$date <- date(TempAir_Raw_df$datetime)
+TempAir_Raw_df$month <- (month(TempAir_Raw_df$datetime))
+TempAir_Raw_df$year <- (year(TempAir_Raw_df$datetime))
+
+# Change to Celsius
+TempAir <- TempAir_Raw_df %>%
+  rename(station = location_id) %>%
+  mutate(AirTemp = round((parameter_value-32)/1.8,1)) %>%
+  select(-c("parameter_cd", "parameter_value", "agency_cd"))
+
+write.csv(TempAir, "TempData/AirTemp/AirTempC.csv")
+```
+
+### 2. Filter data, calculate max airtemp, join data frame 
+* Filter to June-September
+* Calculate max daily temperature for each station
+* Calculate mean max daily temperature since 2010 for each station
+* Join by date: max air temperatures with all water temp (includes flagged data)
+```{r manipulate, warning = FALSE, message = FALSE }
+# Read file written above
+TempAir0 <- read_csv("TempData/AirTemp/AirTempC.csv")
+
+# Filter to summer 
+TempAir <- filter(TempAir0, month > 5 & month <10)
+
+# Character dates 
+# Using full temperature (unflagged, unfiltered dataset)
+oneyear$day <-day(oneyear$date)
+sixmonth$day <- day(sixmonth$date)
+threemonth$day <- day(threemonth$date)
+oneyear <- mutate(oneyear, 
+                  datech = paste0(year, month, day))
+sixmonth <- mutate(sixmonth, 
+                   datech = paste0(year, month, day))
+threemonth <- mutate(threemonth,
+                     datech = paste0(year, month, day))
+
+
+# Calculate average maximum temperature for all July-Septembers of past 10 years
+MaxTempAir <- TempAir %>% 
+  filter(year > 2009) %>%
+  group_by(station, date) %>%
+  summarize(max.airtemp = max(AirTemp)) %>%
+  ungroup()
+
+# Mean max summer temperatures: 
+MeanMaxTempAir <- MaxTempAir %>%
+  filter(!is.na(max.airtemp)) %>%
+  group_by(station) %>%
+  mutate(mean.max = round(mean(max.airtemp, na.rm = TRUE),2))
+
+ggplot(MeanMaxTempAir, aes(max.airtemp)) + geom_histogram() + facet_wrap(~station) +
+    theme_bw()+ theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14))
+
+# For each station:
+MaxTempAir %>%
+  filter(!is.na(max.airtemp)) %>%
+  group_by(station) %>%
+  summarize(mean.max = round(mean(max.airtemp, na.rm = TRUE),2))
+
+# Join water temp and air temp dataframes
+Out12 <- inner_join(MeanMaxTempAir, oneyear, by = c("station", "date")) %>% 
+  filter(Flag_QC1 == "N")
+Out6 <- inner_join(MeanMaxTempAir, sixmonth, by = c("station", "date")) %>% 
+  filter(Flag_QC1 == "N") 
+Out3 <- inner_join(MeanMaxTempAir, threemonth, by = c("station", "date"))%>% 
+  filter(Flag_QC1 == "N")
+
+```
+
+### 3. Flag heat waves, plot {.tabset}
+* Look at overall relationship between water and air temp
+* Look to see if air temp/ heat wave analysis is informative about whether an outlier is an outlier
+* “The World Meteorological Organization defines it as five or more consecutive days during which the daily maximum temperature surpasses the average maximum temperature by 5 °C (9 °F) or more.”
+* Flag QC4 (anomalize outliers) as boxes instead of dots 
+* Color code heat waves by water and air temp (calculated by air temp)
+
+#### Air-Water Pattern
+* Just 2013 
+* Pretty big variability
+* Orange = air, blue = water 
+
+```{r airwater, message = FALSE, warning = FALSE, fig.height = 9, fig.width = 12}
+# Filter for just one summer
+
+airwater <- left_join(TempAir, oneyear) %>% 
+  filter(year == "2013", 
+         AirTemp > 5 & AirTemp < 45,
+         Temp > 0 & Temp <40)
+
+ggplot(airwater) +
+  geom_point(aes(x = datetime, y = AirTemp), color = "orange") +
+  geom_point(aes(x = datetime, y = Temp), color = "blue") + 
+  facet_grid(station~.) + 
+  scale_x_datetime(date_breaks = "5 days") +
+  scale_y_continuous(breaks = seq(10,40,by = 5)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14),
+        legend.position = "bottom")
+
+```
+
+
+#### 12 month
+* No anomalize outliers in this dataset
+```{r heatwave, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 9}
+### Flagging heat waves 
+# Removed airtemp outliers that are > 45C
+# Flag if airtemp > mean max air temp + 5
+# Count number of occurrences in a row 
+# Flag if occurrences >= 5
+heat12 <- Out12 %>% 
+  filter(max.airtemp < 45) %>%
+  group_by(station) %>%
+  mutate(HeatWave = ifelse(max.airtemp>mean.max +5, 1L, 0L)) %>%
+  mutate(issame = cumsum(HeatWave == 0L)) %>%
+  group_by(station, issame) %>%
+  mutate(flag = ifelse(HeatWave == 1L, sum(HeatWave), 0L)) %>%
+  ungroup() %>%
+  mutate(FlagWave = ifelse(flag >=5, "Y", "N")) %>%
+  select(-c(HeatWave, issame, flag, mean.max)) %>%
+  rename(AirTemp = max.airtemp,
+         WaterTemp = Temp)
+
+# Long Format so we have temp broken out by air and water
+LongHeat12 <- pivot_longer(heat12, cols = ends_with("Temp"), names_to = "Medium", values_to = "Temperature") %>%
+  mutate(Type_HeatWave = as.factor(paste0(Medium, "_", FlagWave))) 
+
+LongHeat12 %>%
+  filter(Flag_QC4 == "Y")
+
+# Plot temp vs date
+ggplot(LongHeat12) + 
+  geom_point(aes(x = date, y = Temperature, color = Type_HeatWave, shape = Flag_QC4), size = 3) +
+  facet_grid(station~., scales = "free") +
+  labs(x = "Date",
+       y = "Temperature (C)", 
+       title = "Temp by Date") +
+ scale_color_manual(values = c("lightsalmon", "sienna","lightblue", "blue")) +
+  scale_x_date(date_breaks = "1 year") +
+  scale_shape_manual(values = c(20, 15))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14),
+        legend.position = "bottom")
+
+# Add date factor to be able to plot
+LongHeat12$datech <- as.factor(LongHeat12$datech)
+
+# Plot temp vs discrete date to get rid of spaces in between
+ggplot(LongHeat12) + 
+  geom_point(aes(x = datech, y = Temperature, color = Type_HeatWave, shape = Flag_QC4), size = 3) +
+  facet_grid(station~., scales = "free") +
+  labs(x = "Date",
+       y = "Temperature (C)",
+       title = "Temp by Discrete Date") +
+ scale_color_manual(values = c("lightsalmon", "sienna","lightblue", "blue")) +
+    scale_x_discrete("DiscreteDate", breaks = c("201061", "201161",
+                                               "201261","201361","201461","201561","201672",
+                                               "201761","201861","201961")) +
+  scale_shape_manual(values = c(20, 15))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14),
+        legend.position = "bottom")
+
+```
+
+#### 6 month
+* Look at anomalize outliers to see if they occur during heat waves
+* Not many outliers, mostly in 2011-June for MSD. LIkely outlier as no heat wave or air temp change detected
+
+```{r 6month heatwave, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 9}
+### Comparing trend = 6 month #####################################################
+# Calculate heat waves
+heat6 <- Out6 %>% 
+  filter(max.airtemp < 45) %>%
+  group_by(station) %>%
+  mutate(HeatWave = ifelse(max.airtemp>mean.max+5, 1L, 0L)) %>%
+  mutate(issame = cumsum(HeatWave == 0L)) %>%
+  group_by(station, issame) %>%
+  mutate(flag = ifelse(HeatWave == 1L, sum(HeatWave), 0L)) %>%
+  ungroup() %>%
+  mutate(FlagWave = ifelse(flag >=5, "Y", "N"))
+
+# Long Format
+LongHeat6 <- pivot_longer(heat6, cols = ends_with("Temp"), names_to = "Medium", values_to = "Temperature") %>%
+  mutate(Type_HeatWave = as.factor(paste0(Medium, "_", FlagWave))) 
+
+# Outliers
+LongHeat6 %>%
+  filter(Flag_QC4 == "Y") %>%
+  filter(Medium == "max.airtemp") %>%
+  print(n=50)
+
+# Plot temp vs date
+ggplot(LongHeat6) + 
+  geom_point(aes(x = date, y = Temperature, color = Type_HeatWave, fill = Type_HeatWave,
+                 shape = Flag_QC4), size = 3) +
+  facet_grid(station~., scales = "free") +
+  labs(x = "Date",
+       y = "Temperature (C)",
+       title = "Temp by Date") +
+  scale_x_date(date_breaks = "1 year") +
+ scale_color_manual(values = c("lightsalmon", "sienna","lightblue", "blue")) +
+  scale_fill_manual(values = c("lightsalmon", "sienna","lightblue", "blue")) +
+    scale_shape_manual(values = c(20, 15))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14),
+        legend.position = "bottom")
+
+# Add date factor to be able to plot
+LongHeat6$datech <- as.factor(LongHeat6$datech)
+
+# Plot discrete date
+ggplot(LongHeat6) + 
+  geom_point(aes(x = datech, y = Temperature, color = Type_HeatWave, fill = Type_HeatWave, shape = Flag_QC4), size = 3) +
+  facet_grid(station~., scales = "free") +
+  labs(x = "Date",
+       y = "Temperature (C)", 
+       title = "Temp by Discrete Date") +
+  scale_x_discrete("DiscreteDate", breaks = c("201061", "201161",
+                                               "201261","201361","201461","201561","201672",
+                                               "201761","201861","201961")) +
+ scale_color_manual(values = c("lightsalmon", "sienna","lightblue", "blue")) +
+  scale_fill_manual(values = c("lightsalmon", "sienna","lightblue", "blue")) +
+  scale_shape_manual(values = c(20, 15))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14), 
+        legend.position = "bottom")
+
+```
+
+#### 3 month
+* Look at anomalize outliers to see if they occur during heat waves
+* Informative for some outliers for MSD and SJR
+* Likely not outliers, unless air and temperature sensors connected
+```{r 3month heatwave, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 9}
+## Comparing trend = 3 month ###########################################################
+# Calculate heat wave
+heat3 <- Out3 %>% 
+  filter(max.airtemp < 45) %>%
+  group_by(station) %>%
+  mutate(HeatWave = ifelse(max.airtemp>mean.max+5, 1L, 0L)) %>%
+  mutate(issame = cumsum(HeatWave == 0L)) %>%
+  group_by(station, issame) %>%
+  mutate(flag = ifelse(HeatWave == 1L, sum(HeatWave), 0L)) %>%
+  ungroup() %>%
+  mutate(FlagWave = ifelse(flag >=5, "Y", "N"))
+
+# Long format
+LongHeat3 <- pivot_longer(heat3, cols = ends_with("Temp"), names_to = "Medium", values_to = "Temperature") %>%
+  mutate(Type_HeatWave = as.factor(paste0(Medium, "_", FlagWave)))
+
+# Outliers
+LongHeat3 %>%
+  filter(Flag_QC4 == "Y") %>%
+  filter(Medium == "max.airtemp") %>%
+  print(n = 100)
+
+# Plot 
+ggplot(LongHeat3) + 
+  geom_point(aes(x = date, y = Temperature, color = Type_HeatWave, fill = Type_HeatWave, shape = Flag_QC4), size = 3) +
+  facet_grid(station~., scales = "free") +
+  labs(x = "Date",
+       y = "Temperature (C)",
+       title = "Temp by Date") +
+  scale_x_date(date_breaks = "1 year") +
+ scale_color_manual(values = c("lightsalmon", "sienna","lightblue", "blue")) +
+  scale_fill_manual(values = c("lightsalmon", "sienna","lightblue", "blue")) +
+  scale_shape_manual(values = c(20, 15))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14),
+        legend.position = "bottom")
+
+# Factorize
+LongHeat3$datech <- as.factor(LongHeat3$datech)
+
+# Discrete date
+ggplot(LongHeat3) + 
+  geom_point(aes(x = datech, y = Temperature, color = Type_HeatWave, fill = Type_HeatWave, shape = Flag_QC4), size = 3) +
+  facet_grid(station~., scales = "free") +
+  labs(x = "Date",
+       y = "Temperature (C)",
+       title = "Temp by Discrete Date") +
+  scale_x_discrete("DiscreteDate", breaks = c("201061", "201161",
+                                               "201261","201361","201461","201561","201672",
+                                               "201761","201861","201961")) +
+ scale_color_manual(values = c("lightsalmon", "sienna","lightblue", "blue")) +
+  scale_fill_manual(values = c("lightsalmon", "sienna","lightblue", "blue")) +
+  scale_shape_manual(values = c(20, 15))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+        strip.text = element_text(size = 15), 
+        axis.text = element_text(size = 14), 
+        axis.title = element_text(size = 14), 
+        legend.text = element_text(size = 13), 
+        legend.title= element_text(size = 14),
+        legend.position = "bottom")
+
+```
+
