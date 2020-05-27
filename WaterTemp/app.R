@@ -29,6 +29,11 @@ names(latlons$station) <- latlons$staDesc
 # temp_H <- left_join(temp_H, latlons, by = "station")
 
 
+# Progress bar settings
+info_loading <- "Loading Data"
+progress_color <- "#fef0d9"
+progress_background <- "#e34a33"
+
 # Function to determine whether values are repeating by each station -------------------------------------
 # Inputs are data frame and x (number of repeating values you want to check for)
 # Check if number is same as previous number. If yes, 1. If no, 0.
@@ -66,18 +71,22 @@ ui <- fluidPage(
       uiOutput("station_selector"), # See station_selector in server section
       dateRangeInput("daterange", "Date Range:",
                      start = "1986-01-01", end = "2019-12-31", min = "1980-01-01", startview = "decade"),
+      # Q1: Temperature Cutoffs
       h4("1. Temperature cutoffs"),
       sliderInput("temprange",
                   "Temperature Cutoffs:",
                   min = -10, max = 100,value = c(1,40)),
+      # Q2: Missing Values
       h4("2. Missing Values"),
       numericInput("missvals",
                    "Missing Values allowed per day:",
                    min = 0, max = 24, value = 4),
+      # Q3: Repeating Values
       h4("3. Repeating Values"),
       numericInput("repeatvals",
                    "Repeating values allowed:",
                    min = 0, max = 24, value = 18),
+      # Q4: Anomalize
       h4("4. Anomaly Detection"),
       selectInput("trend",
                   "Trend duration",
@@ -92,10 +101,12 @@ ui <- fluidPage(
       numericInput("alpha",
                    "Select alpha: smaller value makes it more difficult to be an anomaly (3 x IQR = 0.05, 6 x IQR = 0.025, 1.5 x IQR = 0.1)",
                    min = 0.025, max = 0.1, value = 0.05, step = 0.0125),
+      # Q5: Spike (compare to values before and after)
       h4("5. Spike"),
       numericInput("spike",
                    "Threshold temperature difference between values:",
                    min = 0, max = 20, value = 5),
+      # Q6: Rate of change (based on standard deviations)
       h4("6. Rate of Change"),
       numericInput("nsdev",
                    "Rate of change: Number of standard deviations allowed from time average:",
@@ -103,7 +114,9 @@ ui <- fluidPage(
       numericInput("pasthours", 
                    "Rate of Change: Number of hours averaged for rate of change:",
                    min = 0, max = 720, value = 50),
+      # Submit button
       actionButton("submit", "Submit"),
+      # Download button: choose flagged or filtered dataset
       h3("Download Data"),
       p(em(span("Note: Only downloads the data for the selected station and dates.", style = "color:coral"))),
       p(strong("Flagged data"), 
@@ -112,7 +125,6 @@ ui <- fluidPage(
         "contains only flag-free data"),
       selectInput("dataset", "Choose a dataset:",
                   choices = c("Flagged", "Filtered")),
-      
       downloadButton("downloadData", "Download")
       
     ),
@@ -146,6 +158,7 @@ ui <- fluidPage(
                 strong(span("Navy upside down triangle", style = "color:darkslateblue")),
                 "= Rate of Change"),
               
+              # Plot 1: Pre-QC values
               plotOutput("preQC", 
                          click = "preQC_click",
                          dblclick = "preQC_dblclick",
@@ -153,14 +166,37 @@ ui <- fluidPage(
                                            resetOnNew = TRUE)),
               p(strong(span("Single click on a point to look at nearby datetimes and temperatures", style = "color:chocolate"))),
               verbatimTextOutput("info"),
+              # Plot 2: Pre-QC values, flagged, between 1-40 C
               h3("Plot 2: Filtered for temperature limits"),
               plotOutput("postQC_F", dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
                                            resetOnNew = TRUE)),
+              # Table: Flagged values 
               tableOutput("table")
               
-    )
-  )
+    )),
+  
+  
+  # Took this from ZoopSynth App
+  tags$head(tags$style(type="text/css",
+                       paste0("
+                                             #loadmessage {
+                                             position: fixed;
+                                             top: 0px;
+                                             left: 0px;
+                                             width: 100%;
+                                             padding: 5px 0px 5px 0px;
+                                             text-align: center;
+                                             font-weight: bold;
+                                             font-size: 100%;
+                                             color: ", progress_color,";
+                                             background-color: ", progress_background,";
+                                             z-index: 105;
+                                             }
+                                             "))),
+  conditionalPanel(condition="$('html').hasClass('shiny-busy')",
+                   tags$div(info_loading,id="loadmessage")),
+  tags$style(type="text/css", ".recalculating {opacity: 1.0;}")
 )
 
 # Define server logic -------------------------------------------------------------------
@@ -175,6 +211,7 @@ server <- function(input, output) {
                 selected = "ANC") #default choice (not required)
   })
   
+ 
   
   
   ### Define reactive values for the zoom function
@@ -203,7 +240,8 @@ server <- function(input, output) {
       arrange(station, date, hour) %>%
       summarise(total = length(date)) %>%
       mutate(Flag_QC2 = ifelse(total<(24-(input$missvals)), "Y", "N")) %>%
-      select(-total)
+      select(-total) %>%
+      ungroup()
   })
   
   temp_q2 <- eventReactive(input$submit, {
@@ -300,6 +338,7 @@ server <- function(input, output) {
   ### Merge back in QC1 Flags, since these were removed from the q6 dataset
   temp_q1_table <- reactive({
     temp_q1() %>%
+      filter(Flag_QC1 == "Y") %>%
       mutate(Flag_QC2 = "N",
              Flag_QC3 = "N", 
              Flag_QC4 = "N",
@@ -491,10 +530,10 @@ server <- function(input, output) {
   today = today()
   output$downloadData <- downloadHandler(
     filename = function() {
-      paste(input$station, "_", input$dataset, "_", today, ".csv", sep = "")
+      paste(input$station, "_", input$trend, "_", input$dataset, "_", today, ".csv", sep = "")
     },
     content = function(file) {
-      write_csv(datasetInput(), file)
+      write.csv(datasetInput(), file, row.names = FALSE)
     }
   )
   
