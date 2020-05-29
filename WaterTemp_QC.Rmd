@@ -1,5 +1,5 @@
 ---
-title: "CDEC_QA_4"
+title: "WaterTemp_QC"
 author: "Catarina Pien"
 date: "May 21, 2020"
 output: html_document
@@ -68,7 +68,8 @@ temp_q2_a <- temp_q1 %>%
   arrange(station, date, hour) %>%
   summarise(total = n()) %>%
   mutate(Flag_QC2 = ifelse(total < 20, "Y", "N")) %>%
-  select(-total) 
+  select(-total) %<%
+  ungroup()
 
 # Flagged values
 temp_q2_b <- temp_q2_a %>%
@@ -77,17 +78,14 @@ temp_q2_b <- temp_q2_a %>%
 #Join original dataframe with flagged values based on values NOT in common. 
 #based on station and date
 temp_q2 <- temp_q1 %>%
-   filter(Flag_QC1 == "N") %>%
-   left_join(temp_q2_a, by = c("station", "date")) 
+   left_join(temp_q2_a, by = c("station", "date")) %>%
+   filter(Flag_QC1 == "N") # This part is important for QC5 and QC6. Basically removes all values that are not within range (QC1) 
+    # for BET (maybe other stations) there were some alternately repeating values near 0 that were causing lots of spike QCs to be positive.
    #filter(Flag_QC1 == "N") 
-  # This part is important for QC5 and QC6, which look at patterns in the data. Basically removes all values that are not within range (QC1) 
-      # for BET (maybe other stations) there were some alternately repeating values near 0 that were causing lots of spike QCs to be positive.
-
 ```
 
 ## QC3) Flag if there are 18+ repeating values in a row
 
-With help from Michael K
 1. Create new columns indicating whether the temperature at x hour is the same as that of x-1 hours.
 2. Take a cumulative sum of all the rows where temperatures are different
 3. Group by the sum and count up the number of rows where the temperature is the same.
@@ -194,7 +192,7 @@ temp_q5 <- temp_q4 %>%
   arrange(station, datetime) %>%
   mutate(QC5 = abs(Temp- 0.5 * (lag(Temp, n = 1, default = 0) + lead(Temp, n=1, default = 0))))%>%
   mutate(Flag_QC5 = ifelse((QC5 > 5), "Y", "N"))  %>%
-      mutate(Flag_QC5 = replace(Flag_QC5, is.na(Flag_QC5), "N")) %>%
+      mutate(Flag_QC5 = replace(Flag_QC5, is.na(Flag_QC5), "N")) %>% # Replace NA with No
   select(-QC5) %>%
   ungroup()
 
@@ -224,7 +222,7 @@ temp_q6 <- temp_q5 %>%
   mutate(QC6 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
   mutate(sdev_th = 5 * runSD(Temp, 50))%>%
   mutate(Flag_QC6 = ifelse((QC6 > sdev_th), "Y", "N"))  %>%
-      mutate(Flag_QC6 = replace(Flag_QC6, is.na(Flag_QC6), "N")) %>%
+      mutate(Flag_QC6 = replace(Flag_QC6, is.na(Flag_QC6), "N")) %>% # Replace NA with No
   select(-c(QC6, sdev_th)) %>%
   ungroup()
 
@@ -244,7 +242,7 @@ rm(temp_q5_a)
 3. Create flagged dataset and filtered dataset
 
 ```{r final dataset}
-# Merge back in q1 data
+# Merge back in q1 data since these were removed
 # Data that were filtered out were not subsequently run under other QC tests, so NA
 temp_q1_table <- temp_q1 %>%
   filter(Flag_QC1 == "Y") %>%
@@ -254,7 +252,7 @@ temp_q1_table <- temp_q1 %>%
              Flag_QC5 = "NA",
              Flag_QC6 = "NA")
 
-# Combine Flags 
+# Combine Flags from QC1 with rest of flags
 temp_flags <- rbind(temp_q6, temp_q1_table) %>%
   ungroup() %>%
   mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5, ",", Flag_QC6))
@@ -333,7 +331,7 @@ write_csv(Flagged_stations, "Tempdata/QC/Flagged_Percentages.csv")
 # Overall dataset
 Flags <- temp_flags %>%
   filter(grepl("Y", AllFlags))
-print(paste0(round(nrow(temp_flags)/nrow(temp_q6)*100,2), "% flagged"))
+print(paste0(round(nrow(Flags)/nrow(temp_q6)*100,2), "% flagged"))
 
 ```
 
