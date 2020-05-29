@@ -32,8 +32,6 @@ library(readr)
 # install.packages("https://cran.r-project.org/src/contrib/Archive/CDECRetrieve/CDECRetrieve_0.1.4.tar.gz", repos=NULL, method = "libcurl")
 # Or use winzip to unzip the files, copy folder into the .libPaths() specified (or go to Tools Install to check where lib is)
 # ***** or devtools::install_github("flowwest/CDECRetrieve")
-
-
 ```
 
 
