@@ -2,7 +2,12 @@
 # Catarina Pien 
 # 06/01/2020
 
-# Set up the environment----------------------------------------------------------------------------
+# This app takes integrated real-time water temperature data downloaded from CDEC (http://cdec.water.ca.gov/) and allows you to apply quality control filters on it. 
+# Plots will highlight different QC filters and allow you to adjust settings for different filters.
+# Full dataset and metadata published at: 
+
+
+# Set up the environment---------------------------------------------------------
 
 # Clear the environment
 rm(list=ls(all=TRUE))
@@ -29,12 +34,12 @@ latlons <- read.csv("data/latlonsTomerge.csv")
 latlons <- as.list(mutate(latlons, staDesc = paste(station, stationName, sep = " | ")))
 names(latlons$station) <- latlons$staDesc
 
-# Progress bar settings --------------------------------------
+# Progress bar settings --------------------------------------------------------
 info_loading <- "Loading Data"
 progress_color <- "#fef0d9"
 progress_background <- "#e34a33"
 
-# Function to determine whether values are repeating by each station -------------------------------
+# Function to determine whether values are repeating by each station --------------------------
   # Inputs are data frame and x (number of repeating values you want to check for)
   # Check if number is same as previous number. If yes, 1. If no, 0.
   # Cumulative sum so each time a value repeats, cumulative sum goes up
@@ -401,7 +406,7 @@ server <- function(input, output) {
            "Filtered" = temp_final())
   })
   
-  ### ----------------------------------------------------------------------------------------
+  ### Edit temperature data for plot 2 to filter out extreme temps-----------------------
   
   # Plot 2: Create a plot where you only see within temperature limits
   # Filter out temperature range so outliers don't distort the plot to the point that it is 
