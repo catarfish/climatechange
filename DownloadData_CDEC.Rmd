@@ -5,16 +5,16 @@ date: "1/22/2020"
 output: html_document
 ---
 
-# This code downloads water temperature data from CDEC
 # Water Temperature Synthesis
-# Modified from Travis Hinkelmanan (Cramer Fish Sciences) William Anderson (Water Board)
+# Download code adapted from Travis Hinkelmann (Cramer Fish Sciences) and William Anderson (Water Board) (personal communication)
+# This code downloads water temperature data from CDEC (http://cdec.water.ca.gov/)
+# For this example, data downloaded through 2019 and converted to hourly data
 
 Clear the environment
 
 ```{r clear, include = FALSE}
 rm(list=ls(all=TRUE))
 ```
-
 
 Load Packages
 
@@ -74,11 +74,13 @@ for(i in 1:length(sta)){
 # Bind into dataframe 
 cdec_datasets_df <-rbindlist(sensordataset)   #** LIST INTO DATAFRAME **
 
-# Remove unnecessary objects
+# Remove unnecessary objects to save space
 rm(dataset)
 rm(sensordataset)
 
 # Include only stations with event and hourly water temperature data
+# Sensor 25 = Temp_C
+# Sensor 146 = Temp_F
 cdec_temp <- cdec_datasets_df %>% 
   filter(sensor_number == 25 | sensor_number == 146) %>% 
   filter(duration !="daily") %>%
@@ -120,8 +122,8 @@ start <- "1986-01-01"
 end <- "2019-12-31"
 
 # Sensor number, time interval - these are different for each set of stations
-sensor1 <- "25"
-interval1 <- "E"
+sensor1 <- "25" # Water Temperature, Celsius
+interval1 <- "E" # Event = every 15 minutes
 
 ### Download data, bind, write --------------------------------------------
 Temp_Event_F_Raw <- lapply(sta_Ev_F, 
@@ -142,11 +144,9 @@ saveRDS(Temp_E_F_Raw_df, "Tempdata/Raw/Temp_E_F_raw.rds") #write rds
 ### Define stations, sensor, interval ------------------------------------------
 sta_Ev_C <- c("DAR", "ECD", "MKN", "SJR", "SR3", "SUS", "SWE", "VNS")
 
-#Sensor #146 is water temperature in degrees C.
-sensor2 <- "146"
-
-#"E" is for event data
-interval2 <- "E"
+# Sensor number, time interval
+sensor2 <- "146" # Water Temperature, Fahrenheit
+interval2 <- "E" # Event: every 15 minutes
 
 ### Download data, bind, write --------------------------------------------
 Temp_Event_C_Raw <- lapply(sta_Ev_C, 
@@ -173,11 +173,9 @@ sta_H_F <- c("ANC", "ANH", "BAC", "BDL", "BLL", "CCS", "CLL", "CNT", "CPP", "DLC
              "OBI", "OH1", "OH4", "OSJ", "PCT", "PPT", "PTS", "RIV", "ROR", "RPN", "RVB", 
              "SAL", "SJL", "SJR", "SNC", "SRH", "STI", "UNI", "VER", "VIC", "VOL")
 
-#Sensor #25 is water temperature in degrees farenheight
-sensor3 <- "25"
-
-#"H" is for hourly data
-interval3 <- "H"
+# Specify sensor, time interval
+sensor3 <- "25" # 25 = Water Temperature, celsius
+interval3 <- "H" # H = Hourly data
 
 ### Download data, bind, write --------------------------------------------
 Temp_Hourly_F_Raw <- lapply(sta_H_F, 
@@ -198,8 +196,8 @@ saveRDS(Temp_H_F_Raw_df, "Tempdata/Raw/Temp_H_F_raw.rds") #write rds
 
 ### Define stations, sensor, interval ------------------------------------------
 sta_H_C <- c("BKS", "CLC", "CPP", "DV7", "DYR", "HBP", "KA0", "SJR")
-sensor4 <- "146"
-interval4 <- "H"
+sensor4 <- "146" # Water Temperature, Fahrenheit
+interval4 <- "H" # Hourly interval
 
 
 ### Download data, bind, write --------------------------------------------
@@ -228,7 +226,7 @@ Write file of merged data
 ```{r Standardize data, message = FALSE}
 
 # Merge Fahrenheit event and hourly data together
-#Add column Temp (converts F to C) 
+# Add column Temp (converts F to C) 
 # Remove and rename columns
 Temp_F <- rbind(Temp_E_F_Raw_df, Temp_H_F_Raw_df)
 Temp_FtoC <- Temp_F %>% mutate(Temp = round((parameter_value-32)/1.8,1))
@@ -271,7 +269,7 @@ for (name in levels(Temp_all_std$station)) {
 }
 ```
 
-Convert data to hourly
+Convert data to hourly by picking the first value of each hour
 
 ```{r Hourly}
 
