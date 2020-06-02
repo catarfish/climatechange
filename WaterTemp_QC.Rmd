@@ -120,7 +120,6 @@ temp_q3 <- repeating_vals(df = temp_q2, x = 18) %>%
   select(-flag, -issame, -same) %>%
   rename(Flag_QC3 = Flag_repeats) 
 
-filter(temp_q3, Flag_QC3 == "Y")%>% View()
 # Flagged values
 temp_q3_b <- temp_q3 %>%
   filter(Flag_QC3 == "Y")
@@ -275,7 +274,7 @@ write_csv(temp_flags, "TempData/QC/Temp_flagged.csv")
 ### Individual files to csv
 # write each file as a csv
 temp_flags$station <- as.factor(temp_flags$station) # need to factorize the "stations"
-#Get the list of unique MP names
+#Get the list of unique station names
 for (name in levels(temp_flags$station)) {
   #Subset the data station
   tmp=subset(temp_flags,station==name)
@@ -292,7 +291,7 @@ write_csv(temp_final, "TempData/QC/Temp_filtered.csv")
 ### Individual files to csv
 # write each file as a csv
 temp_final$station <- as.factor(temp_final$station) # need to factorize the "stations"
-#Get the list of unique MP names
+#Get the list of unique station names
 for (name in levels(temp_final$station)) {
   #Subset the data station
   tmp=subset(temp_final,station==name)

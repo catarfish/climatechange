@@ -1,0 +1,84 @@
+---
+title: "Heatmaps_Mallory.Rmd"
+author: "Catarina Pien"
+date: "January 24, 2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+```{r clean, include = FALSE, eval = FALSE}
+rm(list=ls(all=TRUE))
+```
+
+Load file, remove NA
+
+```{r message = FALSE, include = FALSE}
+library(readr)
+library(lubridate)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(RColorBrewer)
+
+setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/")
+wtemp <- readRDS("station_files/stations_qa/merged/temp_ex.rds") 
+wtemp <- wtemp %>%   filter(!is.na(range))
+
+```
+
+
+Make Heatmap
+
+```{r Heatmap}
+
+# Define variables
+wtemp$year <- as.factor(wtemp$year)
+wtemp$range <- as.numeric(wtemp$range)
+wtemp$Tmax <- as.numeric(wtemp$Tmax)
+
+
+# Temperature Ranges --------------------------------------------------------
+
+# Select columns you want
+wtempR <- wtemp[,c(1,6,7,10)]
+
+# Spread data so you have a value for each space/time combo
+wtempR0 <- wtempR %>% spread(key=year, value=range) %>% arrange(Longitude)
+
+# Assign stations as row names
+wtempR.m <- as.data.frame(wtempR0)
+row.names(wtempR.m) <- wtempR.m$station
+
+# Matrix of just the temprange data
+wtempR.m <- wtempR.m[,3:26]
+wtempR_matrix <- data.matrix(wtempR.m)
+
+# Make heatmap
+# Note you can either scale the heat map by column or row. 
+# e.g. by column is scaling the temp ranges by year (how do stations compare for one year?)
+# by row would be by site (how do years compare for one station?)
+heatmap(wtempR_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlGnBu"), scale = "column")
+
+
+# Max temperatures ---------------------------------------------------------
+
+# Select columns you want
+wtempT <- wtemp[,c(1,6,7,9)]
+
+# Spread data so you have a value for each space/time combo
+wtempT0 <- wtempT %>% spread(key=year, value=Tmax) %>% arrange(Longitude)
+
+# Assign stations as row names
+wtempT.m <- as.data.frame(wtempT0)
+row.names(wtempT.m) <- wtempT.m$station
+
+# Matrix of just the year, max temp
+wtempT.m <- wtempT.m[,3:26]
+wtempT_matrix <- data.matrix(wtempT.m)
+
+# Make heatmap
+heatmap(wtempT_matrix, Rowv = NA, Colv = NA, col = brewer.pal(9, "YlOrRd"), scale = "column")
+
+```
+
+
