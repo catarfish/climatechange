@@ -7,7 +7,7 @@ output: html_document
 
 # This code downloads water temperature data from CDEC
 # Water Temperature Synthesis
-# Modified from Travis Hinkelmanan (Kramer?) William Anderson (Water Board)
+# Modified from Travis Hinkelmanan (Cramer Fish Sciences) William Anderson (Water Board)
 
 Clear the environment
 
@@ -143,7 +143,11 @@ saveRDS(Temp_E_F_Raw_df, "Tempdata/Raw/Temp_E_F_raw.rds") #write rds
 
 ### Define stations, sensor, interval ------------------------------------------
 sta_Ev_C <- c("DAR", "ECD", "MKN", "SJR", "SR3", "SUS", "SWE", "VNS")
+
+#Sensor #146 is water temperature in degrees C.
 sensor2 <- "146"
+
+#"E" is for event data
 interval2 <- "E"
 
 ### Download data, bind, write --------------------------------------------
@@ -156,7 +160,7 @@ Temp_Event_C_Raw <- lapply(sta_Ev_C,
                               end_date = end)
                  })
 
-Temp_E_C_Raw_df <- bind_rows(Temp_Event_C_Raw) # bind into df
+Temp_E_C_Raw_df <- bind_rows(Temp_Event_C_Raw) # bind into a data frame
 
 write_csv(Temp_E_C_Raw_df, "Tempdata/Raw/Temp_E_C_raw.csv") #write data
 saveRDS(Temp_E_C_Raw_df, "Tempdata/Raw/Temp_E_C_raw.rds") #write rds
@@ -170,7 +174,11 @@ sta_H_F <- c("ANC", "ANH", "BAC", "BDL", "BLL", "CCS", "CLL", "CNT", "CPP", "DLC
              "JER", "KA0", "MAL", "MDM", "MRZ", "MSD", "MSL", "MTB", "NSL", 
              "OBI", "OH1", "OH4", "OSJ", "PCT", "PPT", "PTS", "RIV", "ROR", "RPN", "RVB", 
              "SAL", "SJL", "SJR", "SNC", "SRH", "STI", "UNI", "VER", "VIC", "VOL")
+
+#Sensor #25 is water temperature in degrees farenheight
 sensor3 <- "25"
+
+#"H" is for hourly data
 interval3 <- "H"
 
 ### Download data, bind, write --------------------------------------------
@@ -221,7 +229,9 @@ Write file of merged data
 
 ```{r Standardize data, message = FALSE}
 
-# Merge Fahrenheit event and hourly data together | Add column Temp (converts F to C) | Rm and rename columns
+# Merge Fahrenheit event and hourly data together
+#Add column Temp (converts F to C) 
+# Remove and rename columns
 Temp_F <- rbind(Temp_E_F_Raw_df, Temp_H_F_Raw_df)
 Temp_FtoC <- Temp_F %>% mutate(Temp = round((parameter_value-32)/1.8,1))
 Temp_C_1 <- Temp_FtoC %>% 
