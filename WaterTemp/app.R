@@ -1,6 +1,6 @@
 # Water Temperature Shiny App
 # Catarina Pien 
-# 12/11/2019
+# 06/01/2020
 
 # Set up the environment----------------------------------------------------------------------------
 
@@ -126,12 +126,13 @@ ui <- fluidPage(
       
       # Q6: Rate of change (based on standard deviations)
       h4("6. Rate of Change"),
-      numericInput("nsdev",
-                   "Rate of change: Number of standard deviations allowed from time average:",
-                   min = 0, max = 10, value = 5),
       numericInput("pasthours", 
-                   "Rate of Change: Number of hours averaged for rate of change:",
-                   min = 0, max = 720, value = 50),
+                   "Number of hours averaged for rate of change:",
+                   min = 0, max = 720, value = 50),      
+      numericInput("nsdev",
+                   "Number of standard deviations allowed from time average:",
+                   min = 0, max = 10, value = 5),
+
       
       # Submit button
       actionButton("submit", "Submit"),
@@ -157,7 +158,7 @@ ui <- fluidPage(
                         were filtered out prior to conducting tests QC2-QC6.", 
                         style = "color:chocolate"))),
               tableOutput("vals_flagged"),
-              h3("Plot 1: Pre-QC with flagged values"),
+              h3("Plot 1: Raw data with flagged data highlighted"),
               p(strong(span("To zoom in, highlight points, then double click inside box. 
               Zoom works on both plot 1 and plot 2, but zoomed output will show up in plot 1. 
               Double click on plot 1 to zoom back out.", style = "color:chocolate"))),
@@ -192,7 +193,7 @@ ui <- fluidPage(
               verbatimTextOutput("info"),
               
               # Plot 2: Pre-QC values, flagged, between 1-40 C
-              h3("Plot 2: Filtered for temperature limits"),
+              h3("Plot 2: Data Filtered for temperature limits (QC1)"),
               plotOutput("postQC_F", dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
                                            resetOnNew = TRUE)),
