@@ -37,12 +37,11 @@ temp_H <- temp_H_0 %>%
 temp_H <- temp_H %>%
   filter(!is.na(temp_H$datetime))
 
-
 # Look at data
 str(temp_H)
 head(temp_H)
 
-# Remove unnecessaries
+# Remove unnecessaries to keep from exceeding memory limit
 rm(temp_H_0)
 ```
 
@@ -165,7 +164,6 @@ temp_q4_c <- temp_q4_a %>%
     select(c(datetime, anomaly)) %>%
     as_tibble() 
 
-
 # Join "anomaly" with rest of the data
 temp_q4_d <- inner_join(temp_q3, temp_q4_c, by = c( "datetime", "station"))
 
@@ -185,7 +183,6 @@ temp_q4_b <- temp_q4 %>%
 
 Anomalize is pretty good, but there are a few single points here and there that don't get detected. 
 1. If |temp(t) - mean(temp(t-1) + temp(t+1))| > 5, it is flagged.
-
 
 ```{r Spike test}
 ### ---------------------------------------------
@@ -235,9 +232,6 @@ temp_q6 <- temp_q5 %>%
 temp_q6_b <- temp_q6 %>%
   filter(Flag_QC6 == "Y")
 
-# Remove data
-rm(temp_q5_a)
-
 ```
 
 
@@ -265,8 +259,7 @@ temp_flags <- rbind(temp_q6, temp_q1_table) %>%
 
 # Filtered dataset - only rows that do not have any flags
 temp_final <- temp_flags %>%
-  filter(grepl("N,N,N,N,N,N", AllFlags)) %>%
-  select(-starts_with("Flag"))
+  filter(grepl("N,N,N,N,N,N", AllFlags))
 
 ```
 
