@@ -250,7 +250,7 @@ CSV - includes event and hourly data all combined
 
 ```{r Individual station files, message = FALSE}
 Temp_all_std$station <- as.factor(Temp_all_std$station) # need to factorize the "stations"
-#Get the list of unique MP names
+#Get the list of unique station names
 for (name in levels(Temp_all_std$station)) {
   #Subset the data station
   tmp=subset(Temp_all_std,station==name)

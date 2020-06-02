@@ -20,6 +20,15 @@ library(tibbletime) # rate of change - tables
 setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/climatechange/")
 temp_H <- readRDS("WaterTemp/data/Temp_all_H.rds")
 
+########################
+# This includes station name (rather than code) 
+# Need to make a list so can add "names" which will allow the display of station to be different than the actual code inputted
+latlons <- read.csv("WaterTemp/data/latlonsTomerge.csv")
+latlons <- as.list(mutate(latlons, staDesc = paste(station, stationName, sep = " | ")))
+names(latlons$station) <- latlons$staDesc
+# temp_H <- left_join(temp_H, latlons, by = "station")
+###################################################
+
 # Function to determine whether values are repeating by each station -------------------------------------
 # Inputs are data frame and x (number of repeating values you want to check for)
 # Check if number is same as previous number. If yes, 1. If no, 0.
@@ -38,6 +47,106 @@ repeating_vals = function(df, x){
   return(df)
 }
 
+# # Define User Interface -----------------------------------------------------------------
+# 
+# ui <- fluidPage(
+#   
+#   
+#   # Application title
+#   titlePanel("Water Temperature Synthesis QC App"),
+#   
+#   h4("Alter the inputs on the left sidebar to edit the data"),
+#   
+#   # Sidebar with a slider input for number of bins
+#   sidebarLayout(
+#     position = "left",
+#     sidebarPanel(
+#       h3("Filters"),
+#       h4("Station and Date"),
+#       uiOutput("station_selector"), # See station_selector in server section
+#       dateRangeInput("daterange", "Date Range:",
+#                      start = "1986-01-01", end = "2019-12-31", min = "1980-01-01", startview = "decade"),
+#       h4("1. Temperature cutoffs"),
+#       sliderInput("temprange",
+#                   "Temperature Cutoffs:",
+#                   min = -10, max = 100,value = c(1,40)),
+#       h4("2. Missing Values"),
+#       numericInput("missvals",
+#                    "Missing Values allowed per day:",
+#                    min = 0, max = 24, value = 4),
+#       h4("3. Repeating Values"),
+#       numericInput("repeatvals",
+#                    "Repeating values allowed:",
+#                    min = 0, max = 24, value = 18),
+#       h4("4. Anomaly Detection"),
+#       selectInput("trend",
+#                   "Trend duration",
+#                   list("2 weeks", "1 month", "2 months", "3 months", "4 months", "5 months","6 months", "1 year"), 
+#                   selected = "3 months"),
+#       selectInput("seasonal",
+#                   "Seasonal Decomposition Method (Loess = STL, Median = Twitter):",
+#                   list("STL", "Twitter")),
+#       selectInput("remainder",
+#                   "Remainder Analysis Type (IQR: 3x above, 3x below IQR, GESD: progressively removes critical values, iterative, very slow:",
+#                   list("IQR", "GESD")),
+#       numericInput("alpha",
+#                    "Select alpha: smaller value makes it more difficult to be an anomaly (3 x IQR = 0.05, 6 x IQR = 0.025, 1.5 x IQR = 0.1)",
+#                    min = 0.025, max = 0.1, value = 0.05, step = 0.0125),
+#       h4("5. Spike"),
+#       numericInput("spike",
+#                    "Threshold temperature difference between values:",
+#                    min = 0, max = 20, value = 5),
+#       h4("6. Rate of Change"),
+#       numericInput("nsdev",
+#                    "Rate of change: Number of standard deviations allowed from time average:",
+#                    min = 0, max = 10, value = 5),
+#       numericInput("pasthours", 
+#                    "Rate of Change: Number of hours averaged for rate of change:",
+#                    min = 0, max = 720, value = 50),
+#       actionButton("submit", "Submit"),
+#       h3("Download Data"),
+#       selectInput("dataset", "Choose a dataset:",
+#                   choices = c("Flagged", "Filtered")),
+#       downloadButton("downloadData", "Download")
+#       
+#     ),
+#     
+#     # main panel
+#     mainPanel(h3("Values Flagged"),
+#               tableOutput("vals_flagged"),
+#               h3("Plot 1: Pre-QC with flagged values"),
+#               p(strong("To zoom in, highlight points, then double click inside box. Zoom works on
+#               both plot 1 and plot 2, but zoomed output will show up in plot 1. Double click on plot 1 to zoom back out.")),
+#               
+#               p(strong(span("Blue x", style = "color:darkturquoise")),
+#                 "= QC1 Temperature limits"),
+#               p(strong(span("Yellow triangle", style= "color:gold")),
+#                 "= QC2 Missing values"),
+#               p(strong(span("Red circle", style = "color:firebrick")),
+#                 "= QC3 Repeating values"),
+#               p(strong(span("Green diamond", style = "color:seagreen")),
+#                 "= QC4 Anomalies"), 
+#               p(strong(span("Magenta square", style = "color:mediumorchid")),
+#                 "= QC5 Spike Test"),
+#               p(strong(span("Navy upside down triangle", style = "color:darkslateblue")),
+#                 "= QC6 Rate of Change"),
+#               
+#               plotOutput("preQC", 
+#                          click = "preQC_click",
+#                          dblclick = "preQC_dblclick",
+#                          brush = brushOpts(id = "preQC_brush",
+#                                            resetOnNew = TRUE)),
+#               verbatimTextOutput("info"),
+#               h3("Plot 2: Filtered for temperature limits"),
+#               plotOutput("postQC_F", dblclick = "preQC_dblclick",
+#                          brush = brushOpts(id = "preQC_brush",
+#                                            resetOnNew = TRUE)),
+#               tableOutput("table")
+#               
+#     )
+#   )
+# )
+##############################################
 # Define User Interface -----------------------------------------------------------------
 
 ui <- fluidPage(
@@ -47,13 +156,11 @@ ui <- fluidPage(
   titlePanel("Water Temperature Synthesis QC App"),
   
   h4("Alter the inputs on the left sidebar to edit the data"),
-
+  
   # Sidebar with a slider input for number of bins
   sidebarLayout(
     position = "left",
     sidebarPanel(
-      
-      
       h3("Filters"),
       h4("Station and Date"),
       uiOutput("station_selector"), # See station_selector in server section
@@ -75,13 +182,16 @@ ui <- fluidPage(
       selectInput("trend",
                   "Trend duration",
                   list("2 weeks", "1 month", "2 months", "3 months", "4 months", "5 months","6 months", "1 year"), 
-                       selected = "3 months"),
+                  selected = "3 months"),
       selectInput("seasonal",
                   "Seasonal Decomposition Method (Loess = STL, Median = Twitter):",
                   list("STL", "Twitter")),
       selectInput("remainder",
-                  "Remainder Analysis Type (IQR: 3x above, 3x below IQR, GESD: progressively removes critical values, iterative:",
+                  "Remainder Analysis Type (IQR: 3x above, 3x below IQR, GESD: progressively removes critical values, iterative, very slow:",
                   list("IQR", "GESD")),
+      numericInput("alpha",
+                   "Select alpha: smaller value makes it more difficult to be an anomaly (3 x IQR = 0.05, 6 x IQR = 0.025, 1.5 x IQR = 0.1)",
+                   min = 0.025, max = 0.1, value = 0.05, step = 0.0125),
       h4("5. Spike"),
       numericInput("spike",
                    "Threshold temperature difference between values:",
@@ -95,35 +205,54 @@ ui <- fluidPage(
                    min = 0, max = 720, value = 50),
       actionButton("submit", "Submit"),
       h3("Download Data"),
+      p(em(span("Note: Only downloads the data for the selected station and dates.", style = "color:coral"))),
+      p(strong("Flagged data"), 
+        "contains all data | ", 
+        strong("Filtered data"), 
+        "contains only flag-free data"),
       selectInput("dataset", "Choose a dataset:",
                   choices = c("Flagged", "Filtered")),
+      
       downloadButton("downloadData", "Download")
       
     ),
     
     # main panel
     mainPanel(h3("Values Flagged"),
+              p(em(span("Note: QC1 values (values outside of temperature range) were filtered out prior to conducting tests QC2-QC6", 
+                        style = "color:coral"))),
               tableOutput("vals_flagged"),
               h3("Plot 1: Pre-QC with flagged values"),
-              p(strong("To zoom in, highlight points, then double click inside box. Zoom works on
-              both plot 1 and plot 2, but output will show up in plot 2.")),
+              p(strong(span("To zoom in, highlight points, then double click inside box. Zoom works on
+              both plot 1 and plot 2, but zoomed output will show up in plot 1. 
+                            Double click on plot 1 to zoom back out.", style = "color:chocolate"))),
               
-              p(strong(span("Blue x", style = "color:darkturquoise")),
-              "= QC1 Temperature limits"),
-              p(strong(span("Yellow triangle", style= "color:gold")),
-              "= QC2 Missing values"),
-              p(strong(span("Red circle", style = "color:firebrick")),
-              "= QC3 Repeating values"),
-              p(strong(span("Green diamond", style = "color:seagreen")),
-              "= QC4 Anomalies"), 
-              p(strong(span("Magenta square", style = "color:mediumorchid")),
-              "= QC5 Spike Test"),
-              p(strong(span("Navy upside down triangle", style = "color:darkslateblue")),
-                "= QC6 Rate of Change"),
+              p(strong("QC1"),
+                strong(span("Blue x", style = "color:darkturquoise")),
+                "= Temperature limits"),
+              p(strong("QC2"),
+                strong(span("Yellow triangle", style= "color:gold")),
+                "= Missing values"),
+              p(strong("QC3"),
+                strong(span("Red circle", style = "color:firebrick")),
+                "= Repeating values"),
+              p(strong("QC4"),
+                strong(span("Green diamond", style = "color:seagreen")),
+                "= Anomalies"), 
+              p(strong("QC5"),
+                strong(span("Magenta square", style = "color:mediumorchid")),
+                "= Spike Test"),
+              p(strong("QC6"),
+                strong(span("Navy upside down triangle", style = "color:darkslateblue")),
+                "= Rate of Change"),
               
-              plotOutput("preQC", dblclick = "preQC_dblclick",
+              plotOutput("preQC", 
+                         click = "preQC_click",
+                         dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
                                            resetOnNew = TRUE)),
+              p(strong(span("Single click on a point to look at nearby datetimes and temperatures", style = "color:chocolate"))),
+              verbatimTextOutput("info"),
               h3("Plot 2: Filtered for temperature limits"),
               plotOutput("postQC_F", dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
@@ -133,18 +262,29 @@ ui <- fluidPage(
     )
   )
 )
-
+#####################################################
 # Define server logic -------------------------------------------------------------------
 server <- function(input, output) {
   
+  # ## Creates list of stations based on the dataframe -------------------------------------------  
+  # output$station_selector = renderUI({ #creates station select box object called in ui
+  #   selectInput(inputId = "station", #name of input
+  #               label = "Station Code:", #label displayed in ui
+  #               choices = as.character(unique(temp_H$station)),
+  #               # calls unique values from the station column in the previously created table
+  #               selected = "ANC") #default choice (not required)
+  # })
+  
+  ######################################
   ## Creates list of stations based on the dataframe -------------------------------------------  
   output$station_selector = renderUI({ #creates station select box object called in ui
     selectInput(inputId = "station", #name of input
                 label = "Station Code:", #label displayed in ui
-                choices = as.character(unique(temp_H$station)),
+                choices = latlons$station,
                 # calls unique values from the station column in the previously created table
                 selected = "ANC") #default choice (not required)
   })
+  #####################################
   
   ### Define reactive values for the zoom function
   ranges <- reactiveValues(x = NULL, y = NULL)
@@ -153,7 +293,6 @@ server <- function(input, output) {
   ### Filter station and dates from input
   temp_sta <-  eventReactive(input$submit, {
     temp_H %>%
-      filter(!is.na(datetime)) %>% # This is important for the anomalize part
       filter(station == input$station) %>%
       filter(date >= input$daterange[1] & date <= input$daterange[2]) 
   })
@@ -168,6 +307,7 @@ server <- function(input, output) {
   ### QC2) Missing values ###
   temp_q2_a <- eventReactive(input$submit,{
     temp_q1() %>%
+      filter(Flag_QC1 == "N") %>% # See next comment about removing QC1="Y" values
       group_by(station, date) %>%
       arrange(station, date, hour) %>%
       summarise(total = length(date)) %>%
@@ -176,14 +316,16 @@ server <- function(input, output) {
   })
   
   temp_q2 <- eventReactive(input$submit, {
-    dplyr::left_join(temp_q1(), temp_q2_a(), by = c("station", "date"))
+    left_join(temp_q1(), temp_q2_a(), by = c("station", "date")) %>%
+      filter(Flag_QC1 == "N") # This part is important for QC5 and QC6. Basically removes all values that are not within range (QC1) 
+    # for BET (maybe other stations) there were some alternately repeating values near 0 that were causing lots of spike QCs to be positive.
   })
-
+  
   ### QC3) Repeating Values
   temp_q3 <- eventReactive(input$submit, {
     repeating_vals(df = temp_q2(), x = input$repeatvals)%>%
-    select(-flag, -issame, -same) %>%
-    rename(Flag_QC3 = Flag_repeats) })
+      select(-flag, -issame, -same) %>%
+      rename(Flag_QC3 = Flag_repeats) })
   
   
   ### QC4) Anomalies
@@ -192,22 +334,22 @@ server <- function(input, output) {
   
   temp_q4_c <- eventReactive(input$submit, {
     temp_q4_a() %>%
-    time_decompose(Temp, method = input$seasonal, trend = input$trend) %>%
-    anomalize(remainder, method = input$remainder) %>%
-    time_recompose() %>% 
-    select(c(datetime, anomaly)) %>%
-    as_tibble() })
+      time_decompose(Temp, method = input$seasonal, trend = input$trend) %>%
+      anomalize(remainder, method = input$remainder, alpha = input$alpha) %>%
+      time_recompose() %>% 
+      select(c(datetime, anomaly)) %>%
+      as_tibble() })
   
   temp_q4_d <- eventReactive(input$submit, {
     inner_join(temp_q3(), temp_q4_c(), by = c( "datetime")) })
   
   temp_q4 <- eventReactive(input$submit,{
     temp_q4_d() %>%
-    mutate(anomaly = factor(anomaly)) %>%
-    mutate(anomaly = recode(anomaly, No = "N", Yes = "Y"))  %>%
-    rename(Flag_QC4 = anomaly) })
+      mutate(anomaly = factor(anomaly)) %>%
+      mutate(anomaly = recode(anomaly, No = "N", Yes = "Y"))  %>%
+      rename(Flag_QC4 = anomaly) })
   
-   
+  
   ### Spike
   temp_q5 <- eventReactive(input$submit, {
     temp_q4() %>%
@@ -217,7 +359,7 @@ server <- function(input, output) {
       mutate(Flag_QC5 = ifelse((QC5 > input$spike), "Y", "N"))  %>%
       mutate(Flag_QC5 = replace(Flag_QC5, is.na(Flag_QC5), "N")) %>%
       select(-QC5) %>%
-    ungroup()
+      ungroup()
   })
   
   ### Rate of Change
@@ -260,7 +402,7 @@ server <- function(input, output) {
       filter(Flag_QC6 == "Y")
   })
   
-### Create and select datasets ###---------------------------------------------------------  
+  ### Create and select datasets ###---------------------------------------------------------  
   ### AllFlags
   temp_flags <- reactive( {
     temp_q6() %>%
@@ -271,7 +413,7 @@ server <- function(input, output) {
   ### Filtered data 
   temp_final <- reactive( {
     temp_flags() %>%
-    filter(grepl("N,N,N,N,N,N", AllFlags)) })
+      filter(grepl("N,N,N,N,N,N", AllFlags)) })
   
   ### Have user select which dataset they want
   datasetInput <- reactive({
@@ -280,9 +422,9 @@ server <- function(input, output) {
            "Filtered" = temp_final())
   })
   
-
-### ----------------------------------------------------------------------------------------
- 
+  
+  ### ----------------------------------------------------------------------------------------
+  
   
   
   # Plot 2: Within temperature limits 
@@ -297,15 +439,15 @@ server <- function(input, output) {
   
   temp_q2_b_plot <- reactive({
     temp_q6_plot() %>%
-    filter(Flag_QC2 == "Y") })
+      filter(Flag_QC2 == "Y") })
   
   temp_q3_b_plot <- reactive({
     temp_q6_plot() %>%
-    filter(Flag_QC3 == "Y") })
+      filter(Flag_QC3 == "Y") })
   
   temp_q4_b_plot <- reactive({
     temp_q6_plot() %>%
-    filter(Flag_QC4 == "Y")})
+      filter(Flag_QC4 == "Y")})
   
   temp_q5_b_plot <- reactive({
     temp_q6_plot() %>%
@@ -313,7 +455,7 @@ server <- function(input, output) {
   
   temp_q6_b_plot <- reactive({
     temp_q6_plot() %>%
-    filter(Flag_QC6 == "Y")})
+      filter(Flag_QC6 == "Y")})
   
   
   ###############################################################
@@ -326,7 +468,7 @@ server <- function(input, output) {
     
     # Make table
     # Counts the number of rows of data being flagged
-   temp_flags() %>%
+    temp_flags() %>%
       group_by(station) %>%
       summarize(Init = n(),
                 QC1 = sum(Flag_QC1 =="Y"),
@@ -339,16 +481,16 @@ server <- function(input, output) {
                 #Remaining = sum(Flag_QC1=="N" & Flag_QC2 == "N" & Flag_QC3 =="N" & Flag_QC4 =="N"
                 #                & Flag_QC5 == "N" & Flag_QC6 == "N", na.rm = TRUE),
                 Percent_Flagged = round(QCTotal/Init * 100,1)) %>%
-                #Prop_remaining = round(Remaining/Init*100,1)) %>%
-      arrange(Percent_Removed)
-
+      #Prop_remaining = round(Remaining/Init*100,1)) %>%
+      arrange(Percent_Flagged)
+    
   })
   
   
   ###################################################################
   ## Plot 1: PreQC ---------------------------------------------------
   ##################################################################
- 
+  
   # Plot of all data and flags 
   
   output$preQC <- renderPlot({
@@ -360,7 +502,7 @@ server <- function(input, output) {
     
     # Plot data
     ggplot() +
-      geom_point(data = temp_q5(), aes(datetime, Temp), col = "lightsteelblue3") +
+      geom_point(data = temp_q6(), aes(datetime, Temp), col = "lightsteelblue3") +
       geom_point(data = temp_q1_b(), aes(datetime, Temp), color = "cyan3", size = 4, shape = 4) +
       geom_point(data = temp_q2_b(), aes(datetime, Temp), color = "goldenrod2", size = 3, shape = 2) +
       geom_point(data = temp_q3_b(), aes(datetime, Temp), color = "indianred3", size = 3, shape = 20) +
@@ -391,6 +533,12 @@ server <- function(input, output) {
     }
   })
   
+  output$info <- renderPrint({
+    d <- nearPoints(temp_q6(), input$preQC_click, xvar = "datetime", yvar = "Temp")[1:5,2:3]
+    arrange(d, datetime)
+    d
+  })
+  
   ############################################################################
   ## Plot2: PostQC Final ---------------------------------------------------
   ##############################################################################
@@ -398,8 +546,8 @@ server <- function(input, output) {
   # Plot of data within temperature limits - makes it easier to see if there are really high or low values
   
   output$postQC_F <- renderPlot({
-   
- 
+    
+    
     
     # Plot the data ########################################################################################
     # Each geom_point() plots a different flag
@@ -443,10 +591,10 @@ server <- function(input, output) {
   today = today()
   output$downloadData <- downloadHandler(
     filename = function() {
-      paste(input$station, "_", input$dataset, "_", today, ".rds", sep = "")
+      paste(input$station, "_", input$dataset, "_", today, ".csv", sep = "")
     },
     content = function(file) {
-      write_rds(datasetInput(), file)
+      write_csv(datasetInput(), file)
     }
   )
   

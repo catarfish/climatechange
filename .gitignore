@@ -2,10 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
-.csv
-.rds
-.html
-
+*.csv
+*.rds
+*.html
+*.Rproj
 CDEC_QA_vis_files
 CDEC_QA_comparisons_files
 WaterTemp/data
@@ -14,4 +14,5 @@ CDEC_download_and_compilation_6.Rmd
 Stations_year_start.R
 Stations_agency.R
 Site_Comparisons.R
-
+CDEC_QA_3.Rmd
+CDEC_download_and_compilation_7.Rmd
