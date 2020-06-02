@@ -33,6 +33,11 @@ temp_H_0 <- readRDS("WaterTemp/data/Temp_all_H.rds")
 temp_H <- temp_H_0 %>% 
   filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
 
+# Filter out rows that have "NA" for date/time
+temp_H <- temp_H %>%
+  filter(!is.na(temp_H$datetime))
+
+
 # Look at data
 str(temp_H)
 head(temp_H)
@@ -68,7 +73,7 @@ temp_q2_a <- temp_q1 %>%
   arrange(station, date, hour) %>%
   summarise(total = n()) %>%
   mutate(Flag_QC2 = ifelse(total < 20, "Y", "N")) %>%
-  select(-total) %<%
+  select(-total) %>%
   ungroup()
 
 # Flagged values
@@ -160,6 +165,7 @@ temp_q4_c <- temp_q4_a %>%
     time_recompose() %>% 
     select(c(datetime, anomaly)) %>%
     as_tibble() 
+
 
 # Join "anomaly" with rest of the data
 temp_q4_d <- inner_join(temp_q3, temp_q4_c, by = c( "datetime", "station"))
@@ -258,9 +264,10 @@ temp_flags <- rbind(temp_q6, temp_q1_table) %>%
   mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5, ",", Flag_QC6))
 
 
-# Filtered dataset - no flags
+# Filtered dataset - only rows that do not have any flags
 temp_final <- temp_flags %>%
-  filter(grepl("N,N,N,N,N,N", AllFlags))
+  filter(grepl("N,N,N,N,N,N", AllFlags)) %>%
+  select(-starts_with("Flag"))
 
 ```
 
