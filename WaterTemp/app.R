@@ -193,8 +193,8 @@ ui <- fluidPage(
                          dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
                                            resetOnNew = TRUE)),
-              p(strong(span("Single click on a point to look at nearby 
-                            datetimes and temperatures.", style = "color:chocolate"))),
+              p(strong(span("Single click on a point to display nearby 
+                            date/times and temperatures below.", style = "color:chocolate"))),
               verbatimTextOutput("info"),
               
               # Plot 2: Pre-QC values, flagged, between 1-40 C
