@@ -31,11 +31,18 @@ temp_H_0 <- readRDS("WaterTemp/data/Temp_all_H.rds")
 
 # Filter out stations that are not contiguous to the Delta.
 temp_H <- temp_H_0 %>% 
-  filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
+  filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
 
 # Filter out rows that have "NA" for date/time
 temp_H <- temp_H %>%
   filter(!is.na(temp_H$datetime))
+
+#### Rename variables
+temp_H <- temp_H %>% rename(
+  Station =station,
+  Datetime = datetime,
+  Date = date
+)
 
 # Look at data
 str(temp_H)
@@ -68,8 +75,8 @@ temp_q1_b <- temp_q1 %>%
 # This data frame contains all the dates with less than 20 values. 
 temp_q2_a <- temp_q1 %>%
   filter(Flag_QC1 == "N") %>% # only running on data that have not been flagged by the above to be consistent with rest of QC steps
-  group_by(station, date) %>%
-  arrange(station, date, hour) %>%
+  group_by(Station, Date) %>%
+  arrange(Station, Date, hour) %>%
   summarise(total = n()) %>%
   mutate(Flag_QC2 = ifelse(total < 20, "Y", "N")) %>%
   select(-total) %>%
@@ -82,7 +89,7 @@ temp_q2_b <- temp_q2_a %>%
 #Join original dataframe with flagged values based on values NOT in common. 
 #based on station and date
 temp_q2 <- temp_q1 %>%
-   left_join(temp_q2_a, by = c("station", "date")) %>%
+   left_join(temp_q2_a, by = c("Station", "Date")) %>%
    filter(Flag_QC1 == "N") # This part is important for QC5 and QC6. Basically removes all values that are not within range (QC1) 
     # for BET (maybe other stations) there were some alternately repeating values near 0 that were causing lots of spike QCs to be positive.
    #filter(Flag_QC1 == "N") 
@@ -111,7 +118,7 @@ repeating_vals = function(df, x){
   df$same = ifelse(df$Temp == lag(df$Temp, 1, default = 0), 1L, 0L)
   df = df %>%
     mutate(issame = cumsum(df$same == 0L)) %>%
-    group_by(station, issame) %>%
+    group_by(Station, issame) %>%
     mutate(flag = sum(same)+1 ) %>%
     ungroup() %>%
     mutate(Flag_repeats = ifelse(flag > x, "Y", "N"))
@@ -145,10 +152,10 @@ library(tibbletime)
 # see https://business-science.github.io/anomalize/articles/anomalize_methods.html
   
 # Subset data that can use this method (some data have too short of a period)
-# temp_test <- temp_H %>% filter(station %in% c("OAD"))
+# temp_test <- temp_H %>% filter(Station %in% c("OAD"))
 # Convert data frame to table 
 
-temp_q4_a <- as_tbl_time(temp_q3, index = datetime)
+temp_q4_a <- as_tbl_time(temp_q3, index = Datetime)
 
 # Anomaly Detection
 # time_decompose: separates time series into seasonal, trend, and remainder components
@@ -157,15 +164,15 @@ temp_q4_a <- as_tbl_time(temp_q3, index = datetime)
 # anomalize: applies anomaly detection methods to remainder component
 # time_recompose: calculate limits to separate "normal" data from anomalies
 temp_q4_c <- temp_q4_a %>%
-    group_by(station) %>%
+    group_by(Station) %>%
     time_decompose(Temp, method = "stl", trend = "6 months") %>%
     anomalize(remainder, method = "iqr", alpha = 0.05) %>%
     time_recompose() %>% 
-    select(c(datetime, anomaly)) %>%
+    select(c(Datetime, anomaly)) %>%
     as_tibble() 
 
 # Join "anomaly" with rest of the data
-temp_q4_d <- inner_join(temp_q3, temp_q4_c, by = c( "datetime", "station"))
+temp_q4_d <- inner_join(temp_q3, temp_q4_c, by = c( "Datetime", "Station"))
 
 # Rename "anomaly" Flag_QC4 for consistency, change No to N and Yes to Y
 temp_q4 <- temp_q4_d %>%
@@ -180,6 +187,7 @@ temp_q4_b <- temp_q4 %>%
 ```
 
 ### QC5) Spike test
+- Modified from https://github.com/SuisunMarshBranch/wqptools/blob/master/R/rtqc.r
 
 Anomalize is pretty good, but there are a few single points here and there that don't get detected. 
 1. If |temp(t) - mean(temp(t-1) + temp(t+1))| > 5, it is flagged.
@@ -190,8 +198,8 @@ Anomalize is pretty good, but there are a few single points here and there that 
 # Additionally, if Q5 > 5 (5 degree change in 1 hour), flag. 
 
 temp_q5 <- temp_q4 %>%
-  group_by(station) %>%
-  arrange(station, datetime) %>%
+  group_by(Station) %>%
+  arrange(Station, Datetime) %>%
   mutate(QC5 = abs(Temp- 0.5 * (lag(Temp, n = 1, default = 0) + lead(Temp, n=1, default = 0))))%>%
   mutate(Flag_QC5 = ifelse((QC5 > 5), "Y", "N"))  %>%
       mutate(Flag_QC5 = replace(Flag_QC5, is.na(Flag_QC5), "N")) %>% # Replace NA with No
@@ -209,7 +217,7 @@ rm(temp_q4_a, temp_q4_c, temp_q4_d)
 
 
 ### QC6) Rate of Change Test
-1. Group by station, datetime
+1. Group by Station, Datetime
 2. Define standard deviation threshold (e.g. 5 * sd(last 50 hours)) - could change it to be greater or lesser
 3. If difference between value and the value before it > threshold, it is flagged.
 
@@ -219,8 +227,8 @@ rm(temp_q4_a, temp_q4_c, temp_q4_d)
 # If Q6 > sdev_th, flag.
 
 temp_q6 <- temp_q5 %>%
-  group_by(station) %>%
-  arrange(station, datetime) %>%
+  group_by(Station) %>%
+  arrange(Station, Datetime) %>%
   mutate(QC6 = abs(Temp- lag(Temp, n = 1, default = 0)))%>%
   mutate(sdev_th = 5 * runSD(Temp, 50))%>%
   mutate(Flag_QC6 = ifelse((QC6 > sdev_th), "Y", "N"))  %>%
@@ -254,18 +262,22 @@ temp_q1_table <- temp_q1 %>%
 # Combine Flags from QC1 with rest of flags
 temp_flags <- rbind(temp_q6, temp_q1_table) %>%
   ungroup() %>%
-  mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5, ",", Flag_QC6))
+  mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5, ",", Flag_QC6)) %>%
+        select(-c(year:minute)) %>%
+      select(Station, Datetime, Date, everything())
 
 
 # Filtered dataset - only rows that do not have any flags
 temp_final <- temp_flags %>%
-  filter(grepl("N,N,N,N,N,N", AllFlags))
+  filter(grepl("N,N,N,N,N,N", AllFlags)) %>%
+  select(-c(contains("Flag"))) %>%
+        select(Station, Datetime, Date, everything())
 
 ```
 
 ## Write files (Optional)
 * For Flagged and Filtered datasets:
-- RDS, CSV, individual csv for each station
+- RDS, CSV, individual csv for each Station
 
 ```{r WriteFile, message = FALSE}
 saveRDS(temp_flags, "TempData/QC/Temp_flagged.rds")
@@ -273,14 +285,14 @@ write_csv(temp_flags, "TempData/QC/Temp_flagged.csv")
 
 ### Individual files to csv
 # write each file as a csv
-temp_flags$station <- as.factor(temp_flags$station) # need to factorize the "stations"
-#Get the list of unique station names
-for (name in levels(temp_flags$station)) {
-  #Subset the data station
-  tmp=subset(temp_flags,station==name)
-  #Create a new filename for each station. Designate the folder you want the files in.
+temp_flags$Station <- as.factor(temp_flags$Station) # need to factorize the "Stations"
+#Get the list of unique Station names
+for (name in levels(temp_flags$Station)) {
+  #Subset the data Station
+  tmp=subset(temp_flags,Station==name)
+  #Create a new filename for each Station. Designate the folder you want the files in.
   fn=paste('TempData/QC/Individual/Flagged/',name, "_flagged.csv", sep="")
-  #Save the CSV file for each station
+  #Save the CSV file for each Station
   write_csv(tmp,fn)
 }
 
@@ -290,14 +302,14 @@ write_csv(temp_final, "TempData/QC/Temp_filtered.csv")
 
 ### Individual files to csv
 # write each file as a csv
-temp_final$station <- as.factor(temp_final$station) # need to factorize the "stations"
-#Get the list of unique station names
-for (name in levels(temp_final$station)) {
-  #Subset the data station
-  tmp=subset(temp_final,station==name)
-  #Create a new filename for each station. Designate the folder you want the files in.
+temp_final$Station <- as.factor(temp_final$Station) # need to factorize the "Stations"
+#Get the list of unique Station names
+for (name in levels(temp_final$Station)) {
+  #Subset the data Station
+  tmp=subset(temp_final,Station==name)
+  #Create a new filename for each Station. Designate the folder you want the files in.
   fn=paste('TempData/QC/Individual/Filtered/',name, "_qc.csv", sep="")
-  #Save the CSV file for each station
+  #Save the CSV file for each Station
   write_csv(tmp,fn)
 }
 ```
@@ -308,7 +320,7 @@ for (name in levels(temp_final$station)) {
 ```{r Data removal}
 # By station 
 (Flagged_stations <- temp_flags %>%
-  group_by(station) %>%
+  group_by(Station) %>%
   summarize(Init = n(),
             QC1 = sum(Flag_QC1=="Y"),
             QC2 = sum(Flag_QC2 == "Y"),
