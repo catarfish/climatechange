@@ -26,14 +26,18 @@ library(tibbletime) # rate of change - tables
 #setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/climatechange/WaterTemp/")
 
 # Read in compiled raw temperature data
-temp_H <- readRDS("data/Temp_all_H.rds")
+temp_H_0 <- readRDS("data/Temp_all_H.rds")
+
+# Filter out stations that are not contiguous to the Delta.
+temp_H <- temp_H_0 %>% 
+  filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
 
 #### Rename variables
-temp_H <- temp_H %>% rename(
+temp_H <- temp_H %>% 
+  rename(
   Station =station,
   Datetime = datetime,
-  Date = date
-)
+  Date = date)
 
 # Read in station name, lat, lon
 # As.list will allow you to use names() to display station name rather than Station code
@@ -41,8 +45,10 @@ latlons <- read.csv("data/latlonsTomerge.csv")
 latlons <- rename(latlons,
        Station = station,
        StationName = stationName)
+latlonmin <- as.data.frame(select(latlons, 1:2)) # For merging at the end
 latlons <- as.list(mutate(latlons, staDesc = paste(Station, StationName, sep = " | ")))
 names(latlons$Station) <- latlons$staDesc
+
 
 # Progress bar settings --------------------------------------------------------
 info_loading <- "Loading Data"
@@ -210,7 +216,7 @@ ui <- fluidPage(
               verbatimTextOutput("info"),
               
               # Plot 2: Pre-QC values, flagged, between 1-40 C
-              h3("Plot 2: Data Filtered for temperature limits (QC1)"),
+              h3("Plot 2: Data filtered for temperature limits (QC1)"),
               plotOutput("postQC_F", dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
                                            resetOnNew = TRUE)),
@@ -400,20 +406,24 @@ server <- function(input, output) {
              Flag_QC6 = "NA") })
   
   ### Combine Flags from QC1 with rest of flags
+  # Remove some columns
   temp_flags <- reactive( {
     rbind(temp_q6(), temp_q1_table()) %>%
       ungroup() %>%
-      mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5, ",", Flag_QC6)) %>%
-      select(-c(year:minute)) %>%
-      select(Station, Datetime, Date, everything())
+      mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", 
+                               Flag_QC4, ",", Flag_QC5, ",", Flag_QC6)) %>%
+      left_join(latlonmin, by = "Station") %>%
+            select(-c(year:minute)) %>%
+      select(Station, StationName, Datetime, Date, everything())
   })
   
   ### Filtered dataset - no flags
+  # Remove some columns 
   temp_final <- reactive( {
     temp_flags() %>%
       filter(grepl("N,N,N,N,N,N", AllFlags)) %>%
       select(-c(contains("Flag"))) %>%
-      select(Station, Datetime, Date, everything())
+      select(Station, StationName, Datetime, Date, everything())
       })
   
   ### Have user select which dataset they want
@@ -519,7 +529,7 @@ server <- function(input, output) {
   
   # Print values of points based on your click
   output$info <- renderPrint({
-    d <- nearPoints(temp_flags(), input$preQC_click, xvar = "Datetime", yvar = "Temp")[1:5,2:3]
+    d <- nearPoints(temp_flags(), input$preQC_click, xvar = "Datetime", yvar = "Temp")[1:5,3:4]
     arrange(d, Datetime)
     d
   })
