@@ -28,21 +28,28 @@ library(caTools) # rate of change
 #setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/")
 #### Read files ###
 temp_H_0 <- readRDS("WaterTemp/data/Temp_all_H.rds")
-
-# Filter out stations that are not contiguous to the Delta.
-temp_H <- temp_H_0 %>% 
-  filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
-
-# Filter out rows that have "NA" for date/time
-temp_H <- temp_H %>%
-  filter(!is.na(temp_H$datetime))
+latlons <- read.csv("WaterTemp/data/latlonsTomerge.csv")
 
 #### Rename variables
-temp_H <- temp_H %>% rename(
+temp_H <- temp_H_0 %>% rename(
   Station =station,
   Datetime = datetime,
   Date = date
 )
+
+latlons <- rename(
+  latlons,
+       Station = station,
+       StationName = stationName)
+latlonmin <- as.data.frame(select(latlons, 1:2)) # For merging at the end
+
+# Filter out stations that are not contiguous to the Delta.
+temp_H <- temp_H %>% 
+  filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
+
+# Filter out rows that have "NA" for date/time
+temp_H <- temp_H %>%
+  filter(!is.na(temp_H$Datetime))
 
 # Look at data
 str(temp_H)
@@ -50,6 +57,7 @@ head(temp_H)
 
 # Remove unnecessaries to keep from exceeding memory limit
 rm(temp_H_0)
+
 ```
 
 ## QC1) Flag data outside of reasonable temperature range (1-40C)
@@ -263,15 +271,16 @@ temp_q1_table <- temp_q1 %>%
 temp_flags <- rbind(temp_q6, temp_q1_table) %>%
   ungroup() %>%
   mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5, ",", Flag_QC6)) %>%
+        left_join(latlonmin, by = "Station") %>%
         select(-c(year:minute)) %>%
-      select(Station, Datetime, Date, everything())
+      select(Station, StationName, Datetime, Date, everything())
 
 
 # Filtered dataset - only rows that do not have any flags
 temp_final <- temp_flags %>%
   filter(grepl("N,N,N,N,N,N", AllFlags)) %>%
   select(-c(contains("Flag"))) %>%
-        select(Station, Datetime, Date, everything())
+        select(Station, StationName, Datetime, Date, everything())
 
 ```
 
