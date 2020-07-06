@@ -1,7 +1,7 @@
 ---
 title: "DownloadData_CDEC"
 author: "Catarina Pien"
-date: "6/2/2020"
+date: "7/6/2020"
 output: html_document
 ---
 
@@ -45,8 +45,8 @@ sta_all<-c("BAC", "BET", "BLP", "CSE", "CYG", "FAL", "FLT", "FRK",
           "GOD", "GYS", "GZB", "GZL", "HON", "HUN", "IBS", "MDM", "MHO", "MOK", "MRZ", "MSL",
           "NMR", "OBI", "ODM", "OH4", "OLD", "OSJ", "PCO", "PPT", "ROR", "RSL", "RYC",
           "SMR", "SNC", "SUR", "TEA", "VCU", "VOL", 
-          "BDL", "BLL", "DLC", "DWS", "FPT", "GES", "GLN", "GSS", "HWB", "LIB", "LIS", "MAL",
-          "MIR", "NSL", "RVB", "RYI", "SDI", "SOI", "SRH", "SRV", "SSI", "SSS", "SUT", "SXS","TMS", "TSL",
+          "BDL", "BLL", "DLC", "DWS", "FPT", "GES", "GLN", "GSS", "HWB", "LIB", "LIS", "MAL", "MIR", 
+          "NSL", "RCS", "RVB", "RYF", "RYI", "SDI", "SOI", "SRH", "SRV", "SSI", "SSS", "SUT", "SXS","TMS", "TSL",
           "ANH", "BDT", "BIR", "DGL", "DSJ", "FCT", "GCT", "GLC", "GLE", "HLT", "HOL", "LPS",
           "MAB", "MHR", "MRU", "MRX", "MSD", "MTB", "MUP", "OAD", "OBD", "OH1", "ORI", "ORM", 
           "ORQ", "ORX", "PDC", "PRI", "RRI", "SGA", "SJC", "SJD", "SJG", "SJJ", "SJL", "SJR", 
@@ -110,7 +110,7 @@ sta_Ev_F <- c("BAC", "BET", "BLP", "CSE", "CYG", "FAL", "FLT", "FRK",
           "NMR", "OBI", "ODM", "OH4", "OLD", "OSJ", "PCO", "PPT", "ROR", "RSL", "RYC",
           "SMR", "SNC", "SUR", "TEA", "VCU", "VOL",
           "BDL", "BLL", "DLC", "DWS", "FPT", "GES", "GLN", "GSS", "HWB", "LIB", "LIS", "MAL",
-          "MIR", "NSL", "RVB", "RYI", "SDI", "SOI", "SRH", "SRV", "SSI", "SSS", "SUT", "SXS",
+          "MIR", "NSL", "RCS", "RVB", "RYF", "RYI", "SDI", "SOI", "SRH", "SRV", "SSI", "SSS", "SUT", "SXS",
           "TMS", "TSL", "ANH", "BDT", "BIR", "DGL", "DSJ", "FCT", "GCT", "GLC", "GLE", "HLT", "HOL", "LPS",
           "MAB", "MHR", "MRU", "MRX", "MSD", "MTB", "MUP", "OAD", "OBD", "OH1", "ORI", "ORM", 
           "ORQ", "ORX", "PDC", "PRI", "RIP", "RRI", "SGA", "SJC", "SJD", "SJG", "SJJ", "SJL", "SJR",
@@ -246,9 +246,13 @@ rm(Temp_F, Temp_FtoC, Temp_C)
 
 # Merge converted temp data frames together 
 Temp_all_std <- rbind(Temp_C_1, Temp_C_2)
+Temp_all_std <- rename(Temp_all_std,
+  Station =station,
+  Datetime = datetime)
 saveRDS(Temp_all_std, "Tempdata/Std/Temp_all_std.rds") # Write rds
 write_csv(Temp_all_std, "Tempdata/Std/Temp_all_std.csv") # write csv
 
+# This data was used as the raw table file for EDI.
 
 ```
 
@@ -273,31 +277,31 @@ Convert data to hourly by picking the first value of each hour
 
 ```{r Hourly}
 
-#Temp_all_std <- readRDS("Tempdata/Std/Temp_all_std.rds")
+# Temp_all_std <- readRDS("Tempdata/Std/Temp_all_std.rds")
 
 # Add some columns to sort by date/time object types
-Temp_all_std$station <- as.factor(Temp_all_std$station)
-Temp_all_std$date <- date(Temp_all_std$datetime)
-Temp_all_std$year <- year(Temp_all_std$datetime)
-Temp_all_std$month <- month(Temp_all_std$datetime)
-Temp_all_std$hour <- hour(Temp_all_std$datetime)
-Temp_all_std$minute <- minute(Temp_all_std$datetime)
+Temp_all_std$Station <- as.factor(Temp_all_std$Station)
+Temp_all_std$Date <- date(Temp_all_std$Datetime)
+Temp_all_std$year <- year(Temp_all_std$Datetime)
+Temp_all_std$month <- month(Temp_all_std$Datetime)
+Temp_all_std$hour <- hour(Temp_all_std$Datetime)
+Temp_all_std$minute <- minute(Temp_all_std$Datetime)
 
 # Remove any row where Temp = NA or datetime = NA
 temp_H_0 <- Temp_all_std %>%
   filter(!is.na(Temp)) %>%
-  filter(!is.na(datetime)) # need this for anomalize later or it won't run
+  filter(!is.na(Datetime)) # need this for anomalize later or it won't run
 
 # Convert temperature data to hourly
 temp_H <- temp_H_0 %>%
-  group_by(station, date, hour) %>% #group (calculations) by these vars
-  arrange(station, date, hour, minute) %>% #arrange in order of these vars to visualize duplication
+  group_by(Station, Date, hour) %>% #group (calculations) by these vars
+  arrange(Station, Date, hour, minute) %>% #arrange in order of these vars to visualize duplication
   slice(1) %>% #keep only the first value for each station, date, hour group so 1 value/hour
   ungroup()
 
 # Check that they are all good!
 check <- temp_H %>%
-  group_by(station, date, hour)%>%
+  group_by(Station, Date, hour)%>%
   summarize(vals = n())
 which(check$vals >1) # this should be 0
 
