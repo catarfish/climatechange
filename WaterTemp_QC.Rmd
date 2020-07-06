@@ -31,14 +31,9 @@ temp_H_0 <- readRDS("WaterTemp/data/Temp_all_H.rds")
 latlons <- read.csv("WaterTemp/data/latlonsTomerge.csv")
 
 #### Rename variables
-temp_H <- temp_H_0 %>% rename(
-  Station =station,
-  Datetime = datetime,
-  Date = date
-)
+temp_H <- temp_H_0
 
-latlons <- rename(
-  latlons,
+latlons <- rename(latlons,
        Station = station,
        StationName = stationName)
 latlonmin <- as.data.frame(select(latlons, 1:2)) # For merging at the end

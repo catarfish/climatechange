@@ -23,28 +23,24 @@ library(tibbletime) # rate of change - tables
 
 # Read in file --------------------------------------------------------------
 ### Change setwd if you need to:
-#setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/climatechange/WaterTemp/")
+setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/climatechange/WaterTemp/")
 
 # Read in compiled raw temperature data
 temp_H_0 <- readRDS("data/Temp_all_H.rds")
 
-# Filter out stations that are not contiguous to the Delta.
+# Filter out stations that are not contiguous to the Delta
 temp_H <- temp_H_0 %>% 
-  filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
-
-#### Rename variables
-temp_H <- temp_H %>% 
-  rename(
-  Station =station,
-  Datetime = datetime,
-  Date = date)
+  filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
 
 # Read in station name, lat, lon
 # As.list will allow you to use names() to display station name rather than Station code
 latlons <- read.csv("data/latlonsTomerge.csv")
-latlons <- rename(latlons,
+latlons <- latlons %>%
+  filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) %>% 
+  rename(
        Station = station,
        StationName = stationName)
+
 latlonmin <- as.data.frame(select(latlons, 1:2)) # For merging at the end
 latlons <- as.list(mutate(latlons, staDesc = paste(Station, StationName, sep = " | ")))
 names(latlons$Station) <- latlons$staDesc
