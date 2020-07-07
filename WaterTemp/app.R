@@ -525,7 +525,7 @@ server <- function(input, output) {
   
   # Print values of points based on your click
   output$info <- renderPrint({
-    d <- nearPoints(temp_flags(), input$preQC_click, xvar = "Datetime", yvar = "Temp")[1:5,3:4]
+    d <- nearPoints(temp_flags(), input$preQC_click, xvar = "Datetime", yvar = "Temp")[1:5,c(3,5)]
     arrange(d, Datetime)
     d
   })
