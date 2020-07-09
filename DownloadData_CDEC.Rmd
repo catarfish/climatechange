@@ -105,6 +105,9 @@ Split up into 4 sets of stations:
 
 # Delta/Mokelumne/East Bay, sacR, sanJR (these are designations from CDEC) - this is how stations 
 # are ordered below, and is why they are not in alphabetical order
+
+# TPS would not download so not included
+
 sta_Ev_F <- c("BAC", "BET", "BLP", "CSE", "CYG", "FAL", "FLT", "FRK",
           "GOD", "GYS", "GZB", "GZL", "HON", "HUN", "IBS", "MDM", "MHO", "MOK", "MRZ", "MSL",
           "NMR", "OBI", "ODM", "OH4", "OLD", "OSJ", "PCO", "PPT", "ROR", "RSL", "RYC",

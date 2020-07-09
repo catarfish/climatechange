@@ -29,14 +29,16 @@ setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/C
 temp_H_0 <- readRDS("data/Temp_all_H.rds")
 
 # Filter out stations that are not contiguous to the Delta
+
 temp_H <- temp_H_0 %>% 
   filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
 
 # Read in station name, lat, lon
+# TPS would not download from CDEC
 # As.list will allow you to use names() to display station name rather than Station code
 latlons <- read.csv("data/latlonsTomerge.csv")
 latlons <- latlons %>%
-  filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) %>% 
+  filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "KA0", "ROR", "DV7", "BOY", "TPS")) %>% 
   rename(
        Station = station,
        StationName = stationName)
