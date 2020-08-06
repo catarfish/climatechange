@@ -88,7 +88,7 @@ temp_q1_b <- temp_q1 %>%
 temp_q2_a <- temp_q1 %>%
   filter(Flag_QC1 == "N") %>% # only running on data that have not been flagged by the above to be consistent with rest of QC steps
   group_by(Station, Date) %>%
-  arrange(Station, Date, hour) %>%
+  arrange(Station, Date, Hour) %>%
   summarise(total = n()) %>%
   mutate(Flag_QC2 = ifelse(total < 20, "Y", "N")) %>%
   select(-total) %>%
@@ -273,7 +273,7 @@ temp_flags <- rbind(temp_q6, temp_q1_table) %>%
   ungroup() %>%
   mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", Flag_QC4, ",", Flag_QC5, ",", Flag_QC6)) %>%
         left_join(latlonmin, by = "Station") %>%
-        select(-c(year:minute)) %>%
+  select(-Hour) %>%
       select(Station, StationName, Datetime, Date, everything())
 
 

@@ -288,7 +288,7 @@ server <- function(input, output) {
     temp_q1() %>%
       filter(Flag_QC1 == "N") %>% # See next comment about removing QC1="Y" values
       group_by(Station, Date) %>%
-      arrange(Station, Date, hour) %>%
+      arrange(Station, Date, Hour) %>%
       summarise(total = n()) %>%
       mutate(Flag_QC2 = ifelse(total<(24-(input$missvals)), "Y", "N")) %>%
       select(-total) 
@@ -413,8 +413,7 @@ server <- function(input, output) {
       mutate(AllFlags = paste0(Flag_QC1, ",", Flag_QC2, ",", Flag_QC3, ",", 
                                Flag_QC4, ",", Flag_QC5, ",", Flag_QC6)) %>%
       left_join(latlonmin, by = "Station") %>%
-            select(-c(year:minute)) %>%
-      select(Station, StationName, Datetime, Date, everything())
+      select(Station, StationName, Datetime, Date, Temp, everything())
   })
   
   ### Filtered dataset - no flags
@@ -423,7 +422,7 @@ server <- function(input, output) {
     temp_flags() %>%
       filter(grepl("N,N,N,N,N,N", AllFlags)) %>%
       select(-c(contains("Flag"))) %>%
-      select(Station, StationName, Datetime, Date, everything())
+      select(Station, StationName, Datetime, Date, Temp, everything())
       })
   
   ### Have user select which dataset they want

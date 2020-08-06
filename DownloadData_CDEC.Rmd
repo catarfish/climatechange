@@ -309,7 +309,8 @@ which(check$vals >1) # this should be 0
 
 # Remove extra variables 
 temp_H_f <- temp_H %>%
-  select(c(Station, Datetime, Date, Temp))
+  select(c(Station, Datetime, Temp, Date, hour)) %>%
+    rename(Hour = hour)
 
 # Write data
 saveRDS(temp_H_f, "Tempdata/Hourly/Temp_all_H.rds") # Write rds
