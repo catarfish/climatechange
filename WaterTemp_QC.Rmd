@@ -8,6 +8,14 @@ editor_options:
 chunk_output_type: console
 ---
 
+---------------------------------------------------------------------------------
+In this file, we take the raw hourly CDEC data compiled from DownloadData_CDEC.Rmd. We then run the data through numerous QC tests that were informed by NOAA's Manual for Real-Time Quality Control of In-situ Temperature and Salinity Data:
+https://cdn.ioos.noaa.gov/media/2017/12/qartod_temperature_salinity_manual.pdf
+
+Two files are written, one that has suspect data flagged, one that has all suspect data filtered out. You can change the settings of the QC filters to fit your needs, and use the accompanying RShiny app to visualize how changing filters affects what data gets flagged. 
+------------------------------------------------------------------------------------
+
+
 Start by clearing the environment and loading packages.
 
 ```{r setup, include = FALSE}
@@ -30,28 +38,28 @@ library(caTools) # rate of change
 temp_H_0 <- readRDS("WaterTemp/data/Temp_all_H.rds")
 latlons <- read.csv("WaterTemp/data/latlonsTomerge.csv")
 
-# Filter out stations that are not contiguous to the Delta.
-temp_H <- temp_H_0 %>% 
-  filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR","ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
+# Optional for filtering out non-contiguous sites
+temp_H <- temp_H_0
+#filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR","ECD", "HBP", "ROR", "DV7")) 
 
 # Filter out rows that have "NA" for date/time
 temp_H <- temp_H %>%
   filter(!is.na(temp_H$Datetime))
 
-# Also filter stations for latlon file
-# TPS would not download from CDEC
+# Do some renaming
 latlons <- latlons %>%
-   filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "KA0", "ROR", "DV7", "BOY", "TPS")) %>%
   rename(
        Station = station,
        StationName = stationName)
+# Optional for filtering out non-contiguous sites
+# filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP",  "ROR", "DV7")) %>%
 latlonmin <- as.data.frame(select(latlons, 1:2)) # For merging at the end
 
 # Look at data
 str(temp_H)
 head(temp_H)
 
-# Remove unnecessaries to keep from exceeding memory limit
+# Remove unnecessaries to keep from exceeding memory limit (optional)
 rm(temp_H_0)
 
 ```
@@ -146,19 +154,17 @@ rm(temp_q2_a)
 
 
 ## QC4) Use the anomalize package to flag anomalies
+* This is slow!!
 * Twitter + GESD is for more for highly seasonal data (however, GESD is extremely slow because it is iterative)
 * STL + IQR if seasonality is not a major factor
-* Trend period depends on personal knowledge of data
+* Trend period depends on personal knowledge of data, we analyzed a subset of data to see what worked best
 
 ```{r anomalize}
 library(anomalize)
 library(tibbletime)
 # see https://business-science.github.io/anomalize/articles/anomalize_methods.html
   
-# Subset data that can use this method (some data have too short of a period)
-# temp_test <- temp_H %>% filter(Station %in% c("OAD"))
 # Convert data frame to table 
-
 temp_q4_a <- as_tbl_time(temp_q3, index = Datetime)
 
 # Anomaly Detection
@@ -246,7 +252,6 @@ temp_q6_b <- temp_q6 %>%
 
 ```
 
-
 ## Filter final 
 1. Add back in flagged data from QC1
 2. Combine flags in one column
@@ -280,15 +285,26 @@ temp_final <- temp_flags %>%
 
 ```
 
-## Write files (Optional)
+## Write individual and combined station files (Optional)
 * For Flagged and Filtered datasets:
 - RDS, CSV, individual csv for each Station
+- RDS files are faster to read and write, but you need to use R to read them (can't just open in Excel like a CSV)
 
 ```{r WriteFile, message = FALSE}
+
+# Combined files - flagged
 saveRDS(temp_flags, "TempData/QC/Temp_flagged.rds")
 write_csv(temp_flags, "TempData/QC/Temp_flagged.csv")
 
-### Individual files to csv
+# Combined files - filtered
+saveRDS(temp_final, "TempData/QC/Temp_filtered.rds")
+write_csv(temp_final, "TempData/QC/Temp_filtered.csv")
+
+#----------------------------------------------------------------------------------
+## ONLY RUN THIS NEXT SECTION IF YOU WANT INDIVIDUAL STATION FILES! IT WILL BE SLOW. ##
+#----------------------------------------------------------------------------------
+
+### Individual files to csv (flagged data)
 # write each file as a csv
 temp_flags$Station <- as.factor(temp_flags$Station) # need to factorize the "Stations"
 #Get the list of unique Station names
@@ -301,11 +317,7 @@ for (name in levels(temp_flags$Station)) {
   write_csv(tmp,fn)
 }
 
-
-saveRDS(temp_final, "TempData/QC/Temp_filtered.rds")
-write_csv(temp_final, "TempData/QC/Temp_filtered.csv")
-
-### Individual files to csv
+### Individual files to csv (filtered data)
 # write each file as a csv
 temp_final$Station <- as.factor(temp_final$Station) # need to factorize the "Stations"
 #Get the list of unique Station names
