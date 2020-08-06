@@ -279,7 +279,7 @@ Convert data to hourly by picking the first value of each hour
 ```{r Hourly}
 
 # In case you need to modify anything without re-downloading everything
-# Temp_all_std <- readRDS("Tempdata/Std/Temp_all_std.rds") 
+# Temp_all_std <- readRDS("Tempdata/Std/Temp_all_std.rds")
 
 # Add some columns to sort by date/time object types
 Temp_all_std$Station <- as.factor(Temp_all_std$Station)
@@ -307,11 +307,13 @@ check <- temp_H %>%
   summarize(vals = n())
 which(check$vals >1) # this should be 0
 
-# Write data
-saveRDS(temp_H, "Tempdata/Hourly/Temp_all_H.rds") # Write rds
-write_csv(temp_H, "Tempdata/Hourly/Temp_all_H.csv") # write csv
+# Remove extra variables 
+temp_H_f <- temp_H %>%
+  select(c(Station, Datetime, Date, Temp))
 
-unique(temp_H$Station)
+# Write data
+saveRDS(temp_H_f, "Tempdata/Hourly/Temp_all_H.rds") # Write rds
+write_csv(temp_H_f, "Tempdata/Hourly/Temp_all_H.csv") # write csv
 
 ```
 
