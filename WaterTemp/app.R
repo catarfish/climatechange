@@ -4,7 +4,8 @@
 
 # This app takes integrated real-time water temperature data downloaded from CDEC (http://cdec.water.ca.gov/) and allows you to apply quality control filters on it. 
 # Plots will highlight different QC filters and allow you to adjust settings for different filters.
-# Full dataset and metadata published at: 
+# You can download the flagged or filtered version of each station's dataset.
+# Full dataset and metadata published on EDI. 
 
 
 # Set up the environment---------------------------------------------------------
@@ -30,23 +31,24 @@ temp_H_0 <- readRDS("data/Temp_all_H.rds")
 
 # Filter out stations that are not contiguous to the Delta
 
-temp_H <- temp_H_0 %>% 
-  filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "KA0", "ROR", "DV7", "BOY")) 
+temp_H <- temp_H_0 
+# Optional - to remove non-contiguous stations
+# filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "ROR", "DV7")) 
 
 # Read in station name, lat, lon
-# TPS would not download from CDEC
-# As.list will allow you to use names() to display station name rather than Station code
+
 latlons <- read.csv("data/latlonsTomerge.csv")
 latlons <- latlons %>%
-  filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "KA0", "ROR", "DV7", "BOY", "TPS")) %>% 
   rename(
        Station = station,
        StationName = stationName)
+# Optional - to remove non-contiguous stations
+#  filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "ROR", "DV7")) %>% 
 
+# As.list will allow you to use names() to display station name rather than Station code
 latlonmin <- as.data.frame(select(latlons, 1:2)) # For merging at the end
 latlons <- as.list(mutate(latlons, staDesc = paste(Station, StationName, sep = " | ")))
 names(latlons$Station) <- latlons$staDesc
-
 
 # Progress bar settings --------------------------------------------------------
 info_loading <- "Loading Data"
