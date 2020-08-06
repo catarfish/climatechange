@@ -8,7 +8,7 @@ output: html_document
 # Water Temperature Synthesis
 # Download code adapted from Travis Hinkelmann (Cramer Fish Sciences) and William Anderson (Water Board) (personal communication)
 # This code downloads water temperature data from CDEC (http://cdec.water.ca.gov/)
-# For this example, data downloaded through 2019 and converted to hourly data
+# For this example, data are downloaded through 2019 and converted to hourly data
 
 Clear the environment
 
@@ -24,14 +24,14 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(data.table) #rbindlist()
 library(lubridate) #today()
-library(CDECRetrieve)#cdec_datasets
+library(CDECRetrieve) #cdec_datasets
 library(readr)
 
 # To get CDEC Retrieve initially:  
 # install roxygen2 (normal install method)
 # install.packages("https://cran.r-project.org/src/contrib/Archive/CDECRetrieve/CDECRetrieve_0.1.4.tar.gz", repos=NULL, method = "libcurl")
 # Or use winzip to unzip the files, copy folder into the .libPaths() specified (or go to Tools Install to check where lib is)
-# ***** or devtools::install_github("flowwest/CDECRetrieve")
+# Easiest way: devtools::install_github("flowwest/CDECRetrieve")
 ```
 
 
@@ -50,10 +50,10 @@ sta_all<-c("BAC", "BET", "BLP", "CSE", "CYG", "FAL", "FLT", "FRK",
           "ANH", "BDT", "BIR", "DGL", "DSJ", "FCT", "GCT", "GLC", "GLE", "HLT", "HOL", "LPS",
           "MAB", "MHR", "MRU", "MRX", "MSD", "MTB", "MUP", "OAD", "OBD", "OH1", "ORI", "ORM", 
           "ORQ", "ORX", "PDC", "PRI", "RRI", "SGA", "SJC", "SJD", "SJG", "SJJ", "SJL", "SJR", 
-          "TPI", "TPS", "TRN", "TWA", "TWI", "WCI", "RIP",
+          "TPI", "TRN", "TWA", "TWI", "WCI", "RIP",
           "DAR", "ECD", "MKN", "SR3", "SUS", "SWE", "VNS", "SJR",
           "ANC", "BKS", "CCS", "CLL", "CNT", "CPP", "DMC", "EMM", "FRP", "HBP", "HLL",
-          "OBI", "JER", "KA0", "PCT", "PTS", "RIV", "ROR", "SAL", "STI", "UNI", "VIC", "VOL", "MRZ",
+          "OBI", "JER", "PCT", "PTS", "RIV", "ROR", "SAL", "STI", "UNI", "VIC", "VOL", "MRZ",
           "ANH", "BDL", "BLL", "DV7", "GLN", "MAL", "MSD", "MTB", "NSL", "VER", "RPN", "RVB", "SJL", "SRH",
           "BKS", "CLC", "CPP", "DV7", "DYR", "HBP")
 
@@ -84,7 +84,7 @@ rm(sensordataset)
 cdec_temp <- cdec_datasets_df %>% 
   filter(sensor_number == 25 | sensor_number == 146) %>% 
   filter(duration !="daily") %>%
-  arrange(station)%>%
+  arrange(station) %>%
   mutate(days = end-start)
 
 ```
@@ -105,8 +105,6 @@ Split up into 4 sets of stations:
 
 # Delta/Mokelumne/East Bay, sacR, sanJR (these are designations from CDEC) - this is how stations 
 # are ordered below, and is why they are not in alphabetical order
-
-# TPS would not download so not included
 
 sta_Ev_F <- c("BAC", "BET", "BLP", "CSE", "CYG", "FAL", "FLT", "FRK",
           "GOD", "GYS", "GZB", "GZL", "HON", "HUN", "IBS", "MDM", "MHO", "MOK", "MRZ", "MSL",
@@ -172,7 +170,7 @@ saveRDS(Temp_E_C_Raw_df, "Tempdata/Raw/Temp_E_C_raw.rds") #write rds
 ### Define stations, sensor, interval ------------------------------------------
 sta_H_F <- c("ANC", "ANH", "BAC", "BDL", "BLL", "CCS", "CLL", "CNT", "CPP", "DLC", "DMC", "DV7",
              "EMM", "FRP", "GLC", "GLN", "GOD", "GYS", "HBP", "HLL", "HLT", "HUN", "IBS", 
-             "JER", "KA0", "MAL", "MDM", "MRZ", "MSD", "MSL", "MTB", "NSL", 
+             "JER", "MAL", "MDM", "MRZ", "MSD", "MSL", "MTB", "NSL", 
              "OBI", "OH1", "OH4", "OSJ", "PCT", "PPT", "PTS", "RIV", "ROR", "RPN", "RVB", 
              "SAL", "SJL", "SJR", "SNC", "SRH", "STI", "UNI", "VER", "VIC", "VOL")
 
@@ -198,7 +196,7 @@ saveRDS(Temp_H_F_Raw_df, "Tempdata/Raw/Temp_H_F_raw.rds") #write rds
 ###################################### Hourly Data - Celsius ##############################
 
 ### Define stations, sensor, interval ------------------------------------------
-sta_H_C <- c("BKS", "CLC", "CPP", "DV7", "DYR", "HBP", "KA0", "SJR")
+sta_H_C <- c("BKS", "CLC", "CPP", "DV7", "DYR", "HBP", "SJR")
 sensor4 <- "146" # Water Temperature, Fahrenheit
 interval4 <- "H" # Hourly interval
 
@@ -280,7 +278,8 @@ Convert data to hourly by picking the first value of each hour
 
 ```{r Hourly}
 
-# Temp_all_std <- readRDS("Tempdata/Std/Temp_all_std.rds")
+# In case you need to modify anything without re-downloading everything
+# Temp_all_std <- readRDS("Tempdata/Std/Temp_all_std.rds") 
 
 # Add some columns to sort by date/time object types
 Temp_all_std$Station <- as.factor(Temp_all_std$Station)
@@ -311,6 +310,8 @@ which(check$vals >1) # this should be 0
 # Write data
 saveRDS(temp_H, "Tempdata/Hourly/Temp_all_H.rds") # Write rds
 write_csv(temp_H, "Tempdata/Hourly/Temp_all_H.csv") # write csv
+
+unique(temp_H$Station)
 
 ```
 
