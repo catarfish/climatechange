@@ -23,20 +23,16 @@ library(anomalize) # rate of change
 library(tibbletime) # rate of change - tables
 
 # Read in file --------------------------------------------------------------
-### Change setwd if you need to:
-setwd("C:/Users/cpien/OneDrive - California Department of Water Resources/Work/ClimateChange/R_code/climatechange/WaterTemp/")
 
 # Read in compiled raw temperature data
 temp_H_0 <- readRDS("data/Temp_all_H.rds")
 
 # Filter out stations that are not contiguous to the Delta
-
 temp_H <- temp_H_0 
 # Optional - to remove non-contiguous stations
 # filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "ROR", "DV7")) 
 
 # Read in station name, lat, lon
-
 latlons <- read.csv("data/latlonsTomerge.csv")
 latlons <- latlons %>%
   rename(
@@ -78,9 +74,13 @@ repeating_vals = function(df, x){
 ui <- fluidPage(
   
   # Application title
-  titlePanel("Water Temperature Synthesis QC App"),
+  titlePanel("Water Temperature Synthesis Data Flagging App"),
+  h5("Version 0.1.0"),
   
-  h4("Alter the inputs on the left sidebar to edit the data"),
+  h4("Alter the inputs on the left sidebar to edit the data, then press submit to see flagged data."),
+h5(uiOutput("edi")),
+h5(uiOutput("contact")),
+
   
   # Sidebar with a slider input for number of bins -----------------------
   sidebarLayout(
@@ -114,6 +114,7 @@ ui <- fluidPage(
       
       # Q4: Anomalize
       h4("4. Anomaly Detection"),
+      h5(em(span(uiOutput("anom"), style = "color:chocolate"))),
         # Trend duration
       selectInput("trend",
                   "Trend duration",
@@ -262,6 +263,30 @@ server <- function(input, output) {
                 selected = "ANC") #default choice (not required)
   })
   
+  
+## Hyperlinks
+  # EDI
+  ediurl <- a("https://portal.edirepository.org/nis/home.jsp", href="https://portal.edirepository.org/nis/home.jsp")
+  output$edi <- renderUI({
+    tagList("Integrated dataset is published on the Environmental Data Initiative's Data Portal. Find data and metadata at:", ediurl)
+  })
+  
+  # Contact Info
+  contacturl <- a("Catarina.Pien@water.ca.gov", href="mailto:Catarina.Pien@water.ca.gov")
+  output$contact <- renderUI({
+    tagList("Please email questions to ", contacturl)
+  })
+  
+  # Anomalize
+  anomalizeurl <- a("anomalize package", href="https://business-science.github.io/anomalize/articles/anomalize_methods.html")
+  output$anom <- renderUI({
+    tagList("For more information about this test, see", anomalizeurl)
+  })
+  
+  
+
+  
+
   ### Define reactive values for the zoom function ---------------------------------
   ranges <- reactiveValues(x = NULL, y = NULL)
   
