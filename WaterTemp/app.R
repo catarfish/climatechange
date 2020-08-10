@@ -33,11 +33,7 @@ temp_H <- temp_H_0
 # filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "ROR", "DV7")) 
 
 # Read in station name, lat, lon
-latlons <- read.csv("data/latlonsTomerge.csv")
-latlons <- latlons %>%
-  rename(
-       Station = station,
-       StationName = stationName)
+latlons <- read.csv("data/StationsMetadata.csv")
 # Optional - to remove non-contiguous stations
 #  filter(!station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "ROR", "DV7")) %>% 
 
