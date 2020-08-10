@@ -5,10 +5,10 @@ date: "7/6/2020"
 output: html_document
 ---
 
-# Water Temperature Synthesis
-# Download code adapted from Travis Hinkelmann (Cramer Fish Sciences) and William Anderson (Water Board) (personal communication)
-# This code downloads water temperature data from CDEC (http://cdec.water.ca.gov/)
-# For this example, data are downloaded through 2019 and converted to hourly data
+Water Temperature Synthesis
+Download code adapted from Travis Hinkelmann (Cramer Fish Sciences) and William Anderson (Water Board) (personal communication)
+This code downloads water temperature data from CDEC (http://cdec.water.ca.gov/)
+For this example, data are downloaded through 2019 and converted to hourly data
 
 Clear the environment
 
@@ -90,7 +90,8 @@ cdec_temp <- cdec_datasets_df %>%
 ```
 
 Download Raw Data from CDEC
-These are at Pacific Standard Time 
+These are at Pacific Daylight Time 
+See https://info.water.ca.gov/misc/sql_dates.html for information about how CDEC deals with Daylight Savings Time
 Split up into 4 sets of stations: 
 * Event/Fahrenheit
 * Event/Celsius
