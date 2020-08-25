@@ -262,7 +262,7 @@ server <- function(input, output) {
   
 ## Hyperlinks
   # EDI
-  ediurl <- a("https://portal.edirepository.org/nis/home.jsp", href="https://portal.edirepository.org/nis/home.jsp")
+  ediurl <- a("https://portal.edirepository.org/nis/mapbrowse?packageid=edi.591.2", href="https://portal.edirepository.org/nis/mapbrowse?packageid=edi.591.2")
   output$edi <- renderUI({
     tagList("Integrated dataset is published on the Environmental Data Initiative's Data Portal. Find data and metadata at:", ediurl)
   })
