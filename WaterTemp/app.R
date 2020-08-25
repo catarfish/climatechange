@@ -93,7 +93,7 @@ h5(uiOutput("contact")),
       # Q1: Temperature Cutoffs
       h4("1. Temperature cutoffs"),
       sliderInput("temprange",
-                  "Temperature Cutoffs:",
+                  "Temperature Cutoffs (degreesC):",
                   min = -10, max = 100,value = c(1,40)),
       
       # Q2: Missing Values
@@ -113,7 +113,7 @@ h5(uiOutput("contact")),
       h5(em(span(uiOutput("anom"), style = "color:chocolate"))),
         # Trend duration
       selectInput("trend",
-                  "Trend duration",
+                  "Trend duration (natural trend duration of data):",
                   list("2 weeks", "1 month", "2 months", "3 months", "4 months", 
                        "5 months", "6 months", "9 months", "1 year"), 
                   selected = "6 months"),
@@ -126,31 +126,33 @@ h5(uiOutput("contact")),
       p(em(span("Note: GESD progressively removes critical values 
                 and is thus very slow.", style = "color:chocolate"))),
       selectInput("remainder",
-                  "Remainder Analysis Type:",
+                  "Remainder Analysis Type (IQR = Interquartile Range, GESD = Generalized Extreme Studentized Deviate Test):",
                   list("IQR", "GESD")),
         # Alpha
-      p(em(span("Note: smaller alpha value makes it more difficult 
+  
+      numericInput("alpha",
+                   "Alpha (adjusts outlier detection sensitivity):",
+                   min = 0.025, max = 0.1, value = 0.05, step = 0.0125),
+          p(em(span("Note: smaller alpha value makes it more difficult 
                 to be an anomaly (3 x IQR = alpha 0.05, 6 x IQR = 0.025, 1.5 x IQR = 0.1)", 
                 style = "color:chocolate"))),
-      numericInput("alpha",
-                   "Alpha:",
-                   min = 0.025, max = 0.1, value = 0.05, step = 0.0125),
-      
       # Q5: Spike (compare to values before and after)
       # Modified from https://github.com/SuisunMarshBranch/wqptools/blob/master/R/rtqc.r
       
       h4("5. Spike"),
       numericInput("spike",
-                   "Threshold temperature difference between values:",
+                   "Threshold temperature difference between values (degreesC):",
                    min = 0, max = 20, value = 5),
       
-      # Q6: Rate of change (based on standard deviations)
+      # Q6: Rate of change (based on standard deviations from past n hours of data)
       h4("6. Rate of Change"),
+      p(em(span("Rate of change between Tn and Tn-1 must be less than user-specified standard deviations. Standard deviation is calculated over user-specified time period.", 
+                style = "color:chocolate"))),
       numericInput("pasthours", 
-                   "Number of hours averaged for rate of change:",
+                   "Number of hours averaged for rate of change (1 diurnal/tidal cycle = ~25 hours):",
                    min = 0, max = 720, value = 50),      
       numericInput("nsdev",
-                   "Number of standard deviations allowed from time average:",
+                   "Threshold standard deviations allowed for rate of change:",
                    min = 0, max = 10, value = 5),
 
       
@@ -174,8 +176,10 @@ h5(uiOutput("contact")),
     
     # main panel ------------------------------------------
     mainPanel(h3("Values Flagged"),
-              p(em(span("Note: QC1 values (values outside of temperature range) 
-                        were filtered out prior to conducting tests QC2-QC6.", 
+              p(strong("Displays number of values in station dataset, number of values flagged for each QC filter, and percent flagged overall.",
+                style = "color:chocolate")),
+              p(em(span("Note: Values outside of QC1-specified temperature range
+                        were filtered out prior to conducting tests QC2-QC6 for greater effectiveness of tests.", 
                         style = "color:chocolate"))),
               tableOutput("vals_flagged"),
               h3("Plot 1: Raw data with flagged data highlighted"),
@@ -208,12 +212,12 @@ h5(uiOutput("contact")),
                          dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
                                            resetOnNew = TRUE)),
-              p(strong(span("Single click on a point to display nearby 
+              p(strong(span("Single click on a point from Plot 1 to display nearby 
                             date/times and temperatures below.", style = "color:chocolate"))),
               verbatimTextOutput("info"),
               
               # Plot 2: Pre-QC values, flagged, between 1-40 C
-              h3("Plot 2: Data filtered for temperature limits (QC1)"),
+              h3("Plot 2: Data filtered for user-specified temperature limits (QC1)"),
               plotOutput("postQC_F", dblclick = "preQC_dblclick",
                          brush = brushOpts(id = "preQC_brush",
                                            resetOnNew = TRUE)),
