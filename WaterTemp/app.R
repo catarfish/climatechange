@@ -70,7 +70,7 @@ repeating_vals = function(df, x){
 ui <- fluidPage(
   
   # Application title
-  titlePanel("Water Temperature Synthesis Data Flagging App"),
+  titlePanel("Continuous Water Temperature Synthesis Data Flagging App"),
   h5("Version 0.1.0"),
   
   h4("Alter the inputs on the left sidebar to edit the data, then press submit to see flagged data."),
@@ -141,7 +141,7 @@ h5(uiOutput("contact")),
       
       h4("5. Spike"),
       numericInput("spike",
-                   "Threshold temperature difference between values (degreesC):",
+                   "Threshold temperature difference between consecutive values (degreesC):",
                    min = 0, max = 20, value = 5),
       
       # Q6: Rate of change (based on standard deviations from past n hours of data)
