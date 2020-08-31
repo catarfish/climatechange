@@ -25,10 +25,7 @@ library(tibbletime) # rate of change - tables
 # Read in file --------------------------------------------------------------
 
 # Read in compiled raw temperature data
-temp_H_0 <- readRDS("data/Temp_all_H.rds")
-
-# Filter out stations that are not contiguous to the Delta
-temp_H <- temp_H_0 
+temp_H <- readRDS("data/Temp_all_H.rds")
 # Optional - to remove non-contiguous stations
 # filter(!Station %in% c("CNT", "CPP", "DAR", "DMC", "DYR", "ECD", "HBP", "ROR", "DV7")) 
 
@@ -70,13 +67,13 @@ repeating_vals = function(df, x){
 ui <- fluidPage(
   
   # Application title
-  titlePanel("Continuous Water Temperature Synthesis Data Flagging App"),
-  h5("Version 0.1.0"),
-  
-  h4("Alter the inputs on the left sidebar to edit the data, then press submit to see flagged data."),
-h5(uiOutput("edi")),
-h5(uiOutput("contact")),
-
+  titlePanel(title = div(h2("Continuous Water Temperature Synthesis Data Flagging App", style = "display: inline-block"),
+                         a(img(src="IEP_logo_compliant_colors.jpg", height = 130, align="right", style="display: inline-block"), href="https://water.ca.gov/Programs/Environmental-Services/Interagency-Ecological-Program"), 
+                         a(img(src="DWR.png", height = 130,  align="right", style="display: inline-block"), href="https://water.ca.gov/"),
+                         h5("Version 0.1.0"),
+                         h4("Alter the inputs on the left sidebar to edit the data, then press submit to see flagged data."),
+                         h5(uiOutput("edi")),
+                         h5(uiOutput("contact")))),
   
   # Sidebar with a slider input for number of bins -----------------------
   sidebarLayout(
