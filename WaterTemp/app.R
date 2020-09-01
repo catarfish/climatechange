@@ -325,9 +325,6 @@ server <- function(input, output) {
   
   ####-----------------------------------------------------------------------------
   
-  
-  
-  
   ### Define reactive values for the zoom function ---------------------------------
   ranges <- reactiveValues(x = NULL, y = NULL)
   
