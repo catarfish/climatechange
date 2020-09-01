@@ -45,11 +45,11 @@ progress_color <- "#fef0d9"
 progress_background <- "#e34a33"
 
 # Function to determine whether values are repeating by each station --------------------------
-  # Inputs are data frame and x (number of repeating values you want to check for)
-  # Check if number is same as previous number. If yes, 1. If no, 0.
-  # Cumulative sum so each time a value repeats, cumulative sum goes up
-  # Count the number in a row that are the same
-  # Flag if that number > threshold 
+# Inputs are data frame and x (number of repeating values you want to check for)
+# Check if number is same as previous number. If yes, 1. If no, 0.
+# Cumulative sum so each time a value repeats, cumulative sum goes up
+# Count the number in a row that are the same
+# Flag if that number > threshold 
 
 repeating_vals = function(df, x){
   df$same = ifelse(df$Temp == lag(df$Temp, 1, default = 0), 1L, 0L)
@@ -70,7 +70,7 @@ ui <- fluidPage(
   titlePanel(title = div(h2("Continuous Water Temperature Synthesis Data Flagging App", style = "display: inline-block"),
                          a(img(src="IEP_logo_compliant_colors.jpg", height = 130, align="right", style="display: inline-block"), href="https://water.ca.gov/Programs/Environmental-Services/Interagency-Ecological-Program"), 
                          a(img(src="DWR.png", height = 130,  align="right", style="display: inline-block"), href="https://water.ca.gov/"),
-                         h5("Version 0.1.0"),
+                         h5("Version 1.1"),
                          h4("Alter the inputs on the left sidebar to edit the data, then press submit to see flagged data."),
                          h5(uiOutput("edi")),
                          h5(uiOutput("contact"))),
@@ -109,29 +109,29 @@ ui <- fluidPage(
       # Q4: Anomalize
       h4("4. Anomaly Detection"),
       h5(em(span(uiOutput("anom"), style = "color:chocolate"))),
-        # Trend duration
+      # Trend duration
       selectInput("trend",
                   "Trend duration (natural trend duration of data):",
                   list("2 weeks", "1 month", "2 months", "3 months", "4 months", 
                        "5 months", "6 months", "9 months", "1 year"), 
                   selected = "6 months"),
-        # Seasonal Decomposition Method
+      # Seasonal Decomposition Method
       selectInput("seasonal",
                   "Seasonal Decomposition Method (Loess = STL, Median = Twitter):",
                   list("STL", "Twitter")),
       
-        # Remainder analysis
+      # Remainder analysis
       p(em(span("Note: GESD progressively removes critical values 
                 and is thus very slow.", style = "color:chocolate"))),
       selectInput("remainder",
                   "Remainder Analysis Type (IQR = Interquartile Range, GESD = Generalized Extreme Studentized Deviate Test):",
                   list("IQR", "GESD")),
-        # Alpha
-  
+      # Alpha
+      
       numericInput("alpha",
                    "Alpha (adjusts outlier detection sensitivity):",
                    min = 0.025, max = 0.1, value = 0.05, step = 0.0125),
-          p(em(span("Note: smaller alpha value makes it more difficult 
+      p(em(span("Note: smaller alpha value makes it more difficult 
                 to be an anomaly (3 x IQR = alpha 0.05, 6 x IQR = 0.025, 1.5 x IQR = 0.1)", 
                 style = "color:chocolate"))),
       # Q5: Spike (compare to values before and after)
@@ -152,7 +152,7 @@ ui <- fluidPage(
       numericInput("nsdev",
                    "Threshold standard deviations allowed for rate of change:",
                    min = 0, max = 10, value = 5),
-
+      
       
       # Submit button
       actionButton("submit", "Submit"),
@@ -173,55 +173,66 @@ ui <- fluidPage(
     ),
     
     # main panel ------------------------------------------
-    mainPanel(h3("Values Flagged"),
-              p(strong("Displays number of values in station dataset, number of values flagged for each QC filter, and percent flagged overall.",
-                style = "color:chocolate")),
-              p(em(span("Note: Values outside of QC1-specified temperature range
-                        were filtered out prior to conducting tests QC2-QC6 for greater effectiveness of tests.", 
-                        style = "color:chocolate"))),
-              tableOutput("vals_flagged"),
-              h3("Plot 1: Raw data with flagged data highlighted"),
-              p(strong(span("To zoom in, highlight points, then double click inside box. 
+    mainPanel(
+      tabsetPanel(type = "tabs",
+                  tabPanel("QC Plots",
+                           
+                           h3("Values Flagged"),
+                           p(strong(span("Displays number of values in station dataset, 
+                                     number of values flagged for each QC filter, and percent flagged overall.", 
+                                         style = "color:chocolate"))),
+                           p(em(span("Note: QC1 values (values outside of temperature range) 
+                        were filtered out prior to conducting tests QC2-QC6.", 
+                                     style = "color:chocolate"))),
+                           tableOutput("vals_flagged"),
+                           h3("Plot 1: Raw data with flagged data highlighted"),
+                           p(strong(span("To zoom in, highlight points, then double click inside box. 
               Zoom works on both plot 1 and plot 2, but zoomed output will show up in plot 1. 
               Double click on plot 1 to zoom back out.", style = "color:chocolate"))),
-              
-              p(strong("QC1"),
-                strong(span("Blue x", style = "color:darkturquoise")),
-                "= Temperature limits"),
-              p(strong("QC2"),
-                strong(span("Yellow triangle", style= "color:gold")),
-                "= Missing values"),
-              p(strong("QC3"),
-                strong(span("Red circle", style = "color:firebrick")),
-                "= Repeating values"),
-              p(strong("QC4"),
-                strong(span("Green diamond", style = "color:seagreen")),
-                "= Anomalies"), 
-              p(strong("QC5"),
-                strong(span("Magenta square", style = "color:mediumorchid")),
-                "= Spike Test"),
-              p(strong("QC6"),
-                strong(span("Navy upside down triangle", style = "color:darkslateblue")),
-                "= Rate of Change"),
-              
-              # Plot 1: Pre-QC values
-              plotOutput("preQC", 
-                         click = "preQC_click",
-                         dblclick = "preQC_dblclick",
-                         brush = brushOpts(id = "preQC_brush",
-                                           resetOnNew = TRUE)),
-              p(strong(span("Single click on a point from Plot 1 to display nearby 
+                           
+                           p(strong("QC1"),
+                             strong(span("Blue x", style = "color:darkturquoise")),
+                             "= Temperature limits"),
+                           p(strong("QC2"),
+                             strong(span("Yellow triangle", style= "color:gold")),
+                             "= Missing values"),
+                           p(strong("QC3"),
+                             strong(span("Red circle", style = "color:firebrick")),
+                             "= Repeating values"),
+                           p(strong("QC4"),
+                             strong(span("Green diamond", style = "color:seagreen")),
+                             "= Anomalies"), 
+                           p(strong("QC5"),
+                             strong(span("Magenta square", style = "color:mediumorchid")),
+                             "= Spike Test"),
+                           p(strong("QC6"),
+                             strong(span("Navy upside down triangle", style = "color:darkslateblue")),
+                             "= Rate of Change"),
+                           
+                           # Plot 1: Pre-QC values
+                           plotOutput("preQC", 
+                                      click = "preQC_click",
+                                      dblclick = "preQC_dblclick",
+                                      brush = brushOpts(id = "preQC_brush",
+                                                        resetOnNew = TRUE)),
+                           p(strong(span("Single click on a point from Plot 1 to display nearby 
                             date/times and temperatures below.", style = "color:chocolate"))),
-              verbatimTextOutput("info"),
-              
-              # Plot 2: Pre-QC values, flagged, between 1-40 C
-              h3("Plot 2: Data filtered for user-specified temperature limits (QC1)"),
-              plotOutput("postQC_F", dblclick = "preQC_dblclick",
-                         brush = brushOpts(id = "preQC_brush",
-                                           resetOnNew = TRUE)),
-              
-              # Table: Flagged values 
-              tableOutput("table")
+                           verbatimTextOutput("info"),
+                           
+                           # Plot 2: Pre-QC values, flagged, between 1-40 C
+                           h3("Plot 2: Data filtered for user-specified temperature limits (QC1)"),
+                           plotOutput("postQC_F", dblclick = "preQC_dblclick",
+                                      brush = brushOpts(id = "preQC_brush",
+                                                        resetOnNew = TRUE)),
+                           
+                           # Table: Flagged values 
+                           tableOutput("table")),
+                  
+                  # Tab: Leaflet Map
+                  tabPanel("Map",
+                           h2("Map of Stations"),
+                           
+                           leafletOutput("cdecmap")))
     )),
   
   
@@ -262,7 +273,7 @@ server <- function(input, output) {
   })
   
   
-## Hyperlinks
+  ## Hyperlinks
   # EDI
   ediurl <- a("https://portal.edirepository.org/nis/mapbrowse?packageid=edi.591.2", href="https://portal.edirepository.org/nis/mapbrowse?packageid=edi.591.2")
   output$edi <- renderUI({
@@ -281,10 +292,35 @@ server <- function(input, output) {
     tagList("For more information about this test, see", anomalizeurl)
   })
   
+  ### Map ### ---------------------------------------------------------------------
+  # Palette from viridis
+  staPal <- colorFactor("inferno", domain = latlons$Basin)
   
-
+  # Make leaflet map 
+  output$cdecmap <- renderLeaflet({
+    leaflet(latlons) %>%
+      addTiles() %>%
+      addCircleMarkers(
+        color = ~staPal(Basin),
+        stroke = FALSE, 
+        fillOpacity = 0.9,
+        lng = ~Longitude,
+        lat = ~Latitude,
+        label = ~Station,
+        labelOptions = labelOptions(noHide = T),
+        popup = ~paste(Station, ":", StationName, "<br/>", "Lat:", Latitude,"<br/>", "Long:", Longitude, "<br/>",
+                       "Date Range:", StartDateDataset, "-", EndDateDataset)) %>%
+      addLegend(pal = staPal,
+                values = ~Basin,
+                position = "bottomright")
+  })
   
-
+  
+  ####-----------------------------------------------------------------------------
+  
+  
+  
+  
   ### Define reactive values for the zoom function ---------------------------------
   ranges <- reactiveValues(x = NULL, y = NULL)
   
@@ -299,14 +335,14 @@ server <- function(input, output) {
   })
   
   ### QC1) Range for acceptable temperatures
-    # Flag temperatures that are out of user selected range
+  # Flag temperatures that are out of user selected range
   temp_q1 <- eventReactive(input$submit, { 
     temp_sta() %>%
       mutate(Flag_QC1 = ifelse((Temp<input$temprange[1] | Temp>input$temprange[2]), "Y", "N"))
   })
-
+  
   ### QC2) Missing values
-    # Flag days where there are greater than user selected number of missing values (hours out of 24)
+  # Flag days where there are greater than user selected number of missing values (hours out of 24)
   temp_q2_a <- eventReactive(input$submit,{
     temp_q1() %>%
       filter(Flag_QC1 == "N") %>% # See next comment about removing QC1="Y" values
@@ -326,19 +362,19 @@ server <- function(input, output) {
   })
   
   ### QC3) Repeating Values
-    # Flag values repeating for user selected number of repeats 
-    # Uses function repeating_vals
+  # Flag values repeating for user selected number of repeats 
+  # Uses function repeating_vals
   temp_q3 <- eventReactive(input$submit, {
     repeating_vals(df = temp_q2(), x = input$repeatvals)%>%
       select(-flag, -issame, -same) %>%
       rename(Flag_QC3 = Flag_repeats) })
   
   ### QC4) Anomalies
-    # Use anomalize package to flag anomalies
-    # Twitter and GESD for more highly seasonal data (however GESD very slow)
-    # STL and IQR if seasonality is not a major factor
-    # Trend period depends on personal knowledge of data
-    # see https://business-science.github.io/anomalize/articles/anomalize_methods.html
+  # Use anomalize package to flag anomalies
+  # Twitter and GESD for more highly seasonal data (however GESD very slow)
+  # STL and IQR if seasonality is not a major factor
+  # Trend period depends on personal knowledge of data
+  # see https://business-science.github.io/anomalize/articles/anomalize_methods.html
   
   # Convert data frame to table
   temp_q4_a <- eventReactive(input$submit,{
@@ -371,7 +407,7 @@ server <- function(input, output) {
   
   
   ### QC5) Spike
-    # If |temp(t) - mean(temp(t-1) + temp(t+1))| > 5, it is flagged.
+  # If |temp(t) - mean(temp(t-1) + temp(t+1))| > 5, it is flagged.
   temp_q5 <- eventReactive(input$submit, {
     temp_q4() %>%
       group_by(Station) %>%
@@ -446,7 +482,7 @@ server <- function(input, output) {
       filter(grepl("N,N,N,N,N,N", AllFlags)) %>%
       select(-c(contains("Flag"))) %>%
       select(Station, StationName, Datetime, Date, Temp, everything())
-      })
+  })
   
   ### Have user select which dataset they want
   datasetInput <- reactive({
