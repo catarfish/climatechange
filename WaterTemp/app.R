@@ -73,7 +73,8 @@ ui <- fluidPage(
                          h5("Version 0.1.0"),
                          h4("Alter the inputs on the left sidebar to edit the data, then press submit to see flagged data."),
                          h5(uiOutput("edi")),
-                         h5(uiOutput("contact")))),
+                         h5(uiOutput("contact"))),
+             windowTitle = "Continuous Water Temperature app"),
   
   # Sidebar with a slider input for number of bins -----------------------
   sidebarLayout(
