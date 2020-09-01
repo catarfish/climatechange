@@ -21,6 +21,7 @@ library(scales)
 library(TTR)
 library(anomalize) # rate of change
 library(tibbletime) # rate of change - tables
+library(leaflet)
 
 # Read in file --------------------------------------------------------------
 
