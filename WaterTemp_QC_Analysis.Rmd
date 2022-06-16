@@ -6,8 +6,8 @@ output:
   html_document:
     code_folding: hide
 editor_options: 
-  chunk_output_type: console
   
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
